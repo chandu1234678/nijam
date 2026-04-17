@@ -1199,7 +1199,13 @@ async function send() {
 
     if (currentSessionId) {
       const s = sessions.find(x => x.id === currentSessionId);
-      if (s) document.getElementById("chat-title").textContent = s.title;
+      if (s) {
+        // For file uploads, show filename as title instead of PDF content
+        const displayTitle = fileName
+          ? fileName.replace(/\.[^.]+$/, "")  // strip extension
+          : s.title;
+        document.getElementById("chat-title").textContent = displayTitle;
+      }
     }
   } catch(err) {
     typing.remove();

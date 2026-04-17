@@ -84,10 +84,12 @@ def save_message(db: Session, session_id: int, role: str, content: str, extra: d
     )
     db.add(msg)
     # Auto-title session from first user message
+    # Use explicit title_override if provided (e.g. filename for uploads)
     if role == "user":
         session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
         if session and session.title == "New Chat":
-            session.title = content[:60]
+            title_override = extra.get("title_override")
+            session.title = (title_override or content)[:60]
         if session:
             from datetime import datetime
             session.updated_at = datetime.utcnow()

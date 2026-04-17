@@ -108,6 +108,20 @@ def _extract_docx_text(data: bytes) -> str:
         raise HTTPException(status_code=400, detail=f"Could not read DOCX: {e}")
 
 
+def _rename_session_to_file(db, session_id, display_name: str):
+    """Rename a session to the uploaded filename (called after upload fact-check)."""
+    if not session_id:
+        return
+    try:
+        from app.models import ChatSession
+        s = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+        if s:
+            s.title = display_name[:60]
+            db.commit()
+    except Exception as e:
+        logger.debug("Session rename failed: %s", e)
+
+
 # ─────────────────────────────────────────────────────────────
 # Main upload endpoint
 # ─────────────────────────────────────────────────────────────
@@ -122,20 +136,24 @@ async def upload_file(
     user:     Optional[User] = Depends(get_current_user_optional),
 ):
     """
-    Upload an image, audio file, PDF, or DOCX for fact-checking.
+    Upload an image, audio file, PDF, DOCX, or TXT for fact-checking.
 
     - Image  → Gemini Vision describes it, then fact-checks claim+image
     - Audio  → Whisper transcribes it, then fact-checks the transcript
     - PDF    → Extracts text, then fact-checks the content
     - DOCX   → Extracts text, then fact-checks the content
+    - TXT    → Reads text, then fact-checks the content
     """
     data         = await file.read()
-    file_type    = _detect_type(file.filename or "", file.content_type or "")
+    filename     = file.filename or "upload"
+    file_type    = _detect_type(filename, file.content_type or "")
     size_mb      = _size_mb(data)
     claim        = (claim or "").strip()
+    # Clean display name — strip extension for session title
+    display_name = filename.rsplit(".", 1)[0] if "." in filename else filename
 
     logger.info("Upload: filename=%s type=%s size=%.1fMB claim_len=%d",
-                file.filename, file_type, size_mb, len(claim))
+                filename, file_type, size_mb, len(claim))
 
     # ── IMAGE ─────────────────────────────────────────────────
     if file_type == "image":
@@ -170,9 +188,10 @@ async def upload_file(
         from app.schemas import MessageRequest
         req = MessageRequest(message=claim, image_url=data_uri)
         verification = verify_message(req, db, user)
+        _rename_session_to_file(db, verification.get("session_id"), display_name)
         verification["upload"] = {
             "file_type": "image",
-            "filename":  file.filename,
+            "filename":  filename,
             "size_mb":   round(size_mb, 2),
         }
         return verification
@@ -198,9 +217,10 @@ async def upload_file(
         from app.schemas import MessageRequest
         req = MessageRequest(message=text)
         verification = verify_message(req, db, user)
+        _rename_session_to_file(db, verification.get("session_id"), display_name)
         verification["upload"] = {
             "file_type":    "audio",
-            "filename":     file.filename,
+            "filename":     filename,
             "size_mb":      round(size_mb, 2),
             "transcript":   text,
             "language":     transcription.get("language", language),
@@ -226,9 +246,10 @@ async def upload_file(
         from app.schemas import MessageRequest
         req = MessageRequest(message=claim_text)
         verification = verify_message(req, db, user)
+        _rename_session_to_file(db, verification.get("session_id"), display_name)
         verification["upload"] = {
             "file_type":    "pdf",
-            "filename":     file.filename,
+            "filename":     filename,
             "size_mb":      round(size_mb, 2),
             "extracted_chars": len(text),
             "text_preview": text[:200],
@@ -250,9 +271,10 @@ async def upload_file(
         from app.schemas import MessageRequest
         req = MessageRequest(message=claim_text)
         verification = verify_message(req, db, user)
+        _rename_session_to_file(db, verification.get("session_id"), display_name)
         verification["upload"] = {
             "file_type":    "docx",
-            "filename":     file.filename,
+            "filename":     filename,
             "size_mb":      round(size_mb, 2),
             "extracted_chars": len(text),
             "text_preview": text[:200],
@@ -278,9 +300,10 @@ async def upload_file(
         from app.schemas import MessageRequest
         req = MessageRequest(message=claim_text)
         verification = verify_message(req, db, user)
+        _rename_session_to_file(db, verification.get("session_id"), display_name)
         verification["upload"] = {
             "file_type":    "txt",
-            "filename":     file.filename,
+            "filename":     filename,
             "size_mb":      round(size_mb, 2),
             "extracted_chars": len(text),
             "text_preview": text[:200],
