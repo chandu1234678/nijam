@@ -40,3 +40,6 @@ shap>=0.45.0
 prometheus-client>=0.19.0
 redis>=5.0.0
 hiredis>=2.3.0
+# PDF and DOCX parsing for /upload endpoint
+pdfplumber>=0.10.0
+python-docx>=1.1.0

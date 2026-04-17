@@ -1,11 +1,17 @@
 """
-Review Queue Routes
+Review Queue Routes — PiNE AI
 
-Endpoints for reviewing uncertain claims (confidence 0.45-0.55) to enable active learning.
-Human reviewers can provide corrections that improve model accuracy.
+Human-in-the-loop for uncertain and viral claims.
+Reviewers correct verdicts → stored as feedback → triggers auto-retraining.
+
+Priority tiers:
+  VIRAL     — is_viral=True (spreading fast, highest urgency)
+  TRENDING  — is_trending=True
+  COORDINATED — suspected bot/campaign activity
+  UNCERTAIN — confidence 0.45–0.55 (model unsure)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, func
 from typing import Optional, List
@@ -62,47 +68,54 @@ class ReviewStats(BaseModel):
 def get_review_queue(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    priority: str = Query(default="all", pattern="^(all|viral|trending|coordinated)$"),
+    priority: str = Query(default="all", pattern="^(all|viral|trending|coordinated|uncertain)$"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """
-    Get claims that need human review (confidence 0.45-0.55).
-    
+    Get claims that need human review.
+
     Priority filters:
-    - all: All uncertain claims
-    - viral: Claims with high velocity
-    - trending: Claims gaining traction
-    - coordinated: Potential coordinated campaigns
+    - viral       — spreading fast right now (highest urgency)
+    - trending    — gaining traction
+    - coordinated — suspected bot/campaign activity
+    - uncertain   — model confidence 0.45–0.55
+    - all         — all of the above
     """
-    
-    # Base query: uncertain claims (0.45-0.55 confidence)
-    query = db.query(ClaimRecord).filter(
-        and_(
-            ClaimRecord.confidence >= 0.45,
-            ClaimRecord.confidence <= 0.55
+    # Base query — all claims
+    query = db.query(ClaimRecord)
+
+    if priority == "uncertain":
+        query = query.filter(
+            and_(ClaimRecord.confidence >= 0.45, ClaimRecord.confidence <= 0.55)
         )
-    )
-    
-    # Apply priority filter
-    if priority == "viral":
-        # Join with velocity records to find viral claims
+    elif priority == "viral":
         query = query.join(
-            VelocityRecord,
-            ClaimRecord.claim_hash == VelocityRecord.claim_hash
+            VelocityRecord, ClaimRecord.claim_hash == VelocityRecord.claim_hash
         ).filter(VelocityRecord.is_viral == True)
-    
     elif priority == "trending":
         query = query.join(
-            VelocityRecord,
-            ClaimRecord.claim_hash == VelocityRecord.claim_hash
+            VelocityRecord, ClaimRecord.claim_hash == VelocityRecord.claim_hash
         ).filter(VelocityRecord.is_trending == True)
-    
     elif priority == "coordinated":
         query = query.join(
-            VelocityRecord,
-            ClaimRecord.claim_hash == VelocityRecord.claim_hash
+            VelocityRecord, ClaimRecord.claim_hash == VelocityRecord.claim_hash
         ).filter(VelocityRecord.is_coordinated == True)
+    else:  # all — uncertain OR viral/trending/coordinated
+        query = query.filter(
+            or_(
+                and_(ClaimRecord.confidence >= 0.45, ClaimRecord.confidence <= 0.55),
+                ClaimRecord.claim_hash.in_(
+                    db.query(VelocityRecord.claim_hash).filter(
+                        or_(
+                            VelocityRecord.is_viral == True,
+                            VelocityRecord.is_trending == True,
+                            VelocityRecord.is_coordinated == True,
+                        )
+                    )
+                )
+            )
+        )
     
     # Order by most recent first
     query = query.order_by(desc(ClaimRecord.created_at))
@@ -152,23 +165,23 @@ def get_review_queue(
 @router.post("/submit")
 def submit_review(
     review: ReviewSubmission,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """
-    Submit a human review for an uncertain claim.
-    Stores the correction in UserFeedback for future retraining.
+    Submit a human review for a claim.
+    - Stores correction in UserFeedback for retraining
+    - Immediately triggers retraining if the claim is viral (high urgency)
+    - Otherwise uses the normal threshold-based auto-retrain
     """
-    
-    # Validate verdict
     if review.verdict not in ("real", "fake"):
         raise HTTPException(status_code=400, detail="verdict must be 'real' or 'fake'")
-    
-    # Get the claim
+
     claim = db.query(ClaimRecord).filter(ClaimRecord.id == review.claim_id).first()
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
-    
+
     # Check if already reviewed by this user
     existing = db.query(UserFeedback).filter(
         and_(
@@ -176,41 +189,139 @@ def submit_review(
             UserFeedback.claim_text == claim.claim_text
         )
     ).first()
-    
+
     if existing:
-        # Update existing review
-        existing.actual = review.verdict
+        existing.actual     = review.verdict
         existing.confidence = review.confidence or claim.confidence
         existing.created_at = datetime.utcnow()
-        logger.info(f"Updated review for claim {claim.id} by user {user.id}")
+        logger.info("Updated review for claim %d by user %d", claim.id, user.id)
     else:
-        # Create new feedback
         feedback = UserFeedback(
-            user_id=user.id,
-            claim_text=claim.claim_text[:1000],
-            predicted=claim.verdict,
-            actual=review.verdict,
-            confidence=review.confidence or claim.confidence,
+            user_id    = user.id,
+            claim_text = claim.claim_text[:1000],
+            predicted  = claim.verdict,
+            actual     = review.verdict,
+            confidence = review.confidence or claim.confidence,
         )
         db.add(feedback)
-        logger.info(f"New review for claim {claim.id} by user {user.id}: {claim.verdict} → {review.verdict}")
-    
+        logger.info("New review claim %d by user %d: %s → %s",
+                    claim.id, user.id, claim.verdict, review.verdict)
+
     db.commit()
-    
-    # ── WebSocket notification ────────────────────────────────
-    from app.websocket import notify_review_queue_update
-    import asyncio
+
+    # Check if this is a viral claim — if so, trigger immediate retraining
+    velocity = db.query(VelocityRecord).filter(
+        VelocityRecord.claim_hash == claim.claim_hash
+    ).order_by(desc(VelocityRecord.created_at)).first()
+
+    is_viral_claim = velocity and (velocity.is_viral or velocity.is_trending)
+
+    if is_viral_claim:
+        # Immediate background retrain for viral misinformation
+        logger.info("Viral claim reviewed — triggering immediate retraining")
+        background_tasks.add_task(_trigger_retrain_for_viral, db, claim.claim_text, review.verdict)
+        retrain_triggered = True
+    else:
+        # Normal threshold-based retrain check
+        try:
+            from app.analysis.continuous_learning import maybe_retrain
+            retrain_status = maybe_retrain(db)
+            retrain_triggered = retrain_status.get("triggered", False)
+        except Exception as e:
+            logger.debug("Continuous learning check failed: %s", e)
+            retrain_triggered = False
+
+    # WebSocket notification
     try:
+        from app.websocket import notify_review_queue_update
+        import asyncio
         asyncio.create_task(notify_review_queue_update("all"))
-    except Exception as e:
-        logger.debug(f"WebSocket notification skipped: {e}")
-    
+    except Exception:
+        pass
+
     return {
-        "success": True,
-        "message": "Review submitted successfully",
-        "claim_id": claim.id,
-        "verdict": review.verdict,
+        "success":          True,
+        "message":          "Review submitted successfully",
+        "claim_id":         claim.id,
+        "verdict":          review.verdict,
+        "is_viral_claim":   is_viral_claim,
+        "retrain_triggered": retrain_triggered,
     }
+
+
+def _trigger_retrain_for_viral(db, claim_text: str, correct_verdict: str):
+    """
+    Background task: immediately retrain when a viral claim is corrected.
+    Adds the correction with high weight and runs retrain_from_feedback.py.
+    """
+    import threading
+    from app.analysis.continuous_learning import _run_retrain
+    from app.models import UserFeedback
+    from sqlalchemy import func
+
+    try:
+        feedback_count = db.query(func.count(UserFeedback.id)).filter(
+            UserFeedback.predicted != UserFeedback.actual
+        ).scalar() or 0
+
+        logger.info("Viral claim retrain: %d total corrections, triggering now", feedback_count)
+        thread = threading.Thread(
+            target=_run_retrain,
+            args=(feedback_count,),
+            daemon=True,
+            name="viral-retrain",
+        )
+        thread.start()
+    except Exception as e:
+        logger.error("Viral retrain trigger failed: %s", e)
+
+
+@router.post("/collect-training-data")
+def collect_training_data(
+    topic: str = "misinformation",
+    max_samples: int = Query(default=50, ge=10, le=200),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Collect labeled training samples from live news sources.
+    Fetches real news (label=real) and debunked claims (label=fake)
+    and stores them as UserFeedback for the next retraining cycle.
+    """
+    try:
+        from app.analysis.news_aggregator import collect_training_samples
+        samples = collect_training_samples(topic=topic, max_samples=max_samples)
+
+        added = 0
+        for s in samples:
+            text = s.get("text", "").strip()
+            if not text or len(text) < 30:
+                continue
+            label   = s.get("label", 0)
+            verdict = "fake" if label == 1 else "real"
+            # Store as auto-labeled feedback (user_id=None = system-generated)
+            fb = UserFeedback(
+                user_id    = None,
+                claim_text = text[:1000],
+                predicted  = "uncertain",
+                actual     = verdict,
+                confidence = 0.8,
+            )
+            db.add(fb)
+            added += 1
+
+        db.commit()
+        logger.info("Collected %d training samples for topic: %s", added, topic)
+
+        return {
+            "success":        True,
+            "samples_added":  added,
+            "topic":          topic,
+            "message":        f"Added {added} labeled samples. Retraining will trigger automatically.",
+        }
+    except Exception as e:
+        logger.error("Training data collection failed: %s", e)
+        raise HTTPException(500, f"Collection failed: {e}")
 
 
 @router.get("/stats", response_model=ReviewStats)

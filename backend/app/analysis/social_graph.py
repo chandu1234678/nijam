@@ -435,34 +435,21 @@ _social_graph_analyzer = SocialGraphAnalyzer()
 
 def analyze_social_spread(claim_text: str, velocity_data: Dict = None) -> Dict[str, any]:
     """
-    Analyze claim spread across social media platforms
-    
-    Args:
-        claim_text: Claim to analyze
-        velocity_data: Optional velocity tracking data
-        
-    Returns:
-        Combined analysis with campaign score
+    Analyze claim spread across social media platforms.
+    Delegates to news_aggregator for live Twitter + Reddit data.
     """
-    # Analyze Twitter
-    twitter_data = _social_graph_analyzer.analyze_twitter_spread(claim_text)
-    
-    # Analyze Reddit
-    reddit_data = _social_graph_analyzer.analyze_reddit_spread(claim_text)
-    
-    # Calculate campaign score
-    velocity_data = velocity_data or {}
-    campaign_score, indicators = _social_graph_analyzer.calculate_campaign_score(
-        twitter_data, reddit_data, velocity_data
-    )
-    
-    return {
-        'twitter': twitter_data,
-        'reddit': reddit_data,
-        'campaign_score': campaign_score,
-        'campaign_indicators': indicators,
-        'is_coordinated_campaign': campaign_score > 0.6
-    }
+    try:
+        from app.analysis.news_aggregator import get_full_spread_analysis
+        return get_full_spread_analysis(claim_text, velocity_data or {})
+    except Exception as e:
+        logger.warning("Social spread analysis failed: %s", e)
+        return {
+            "twitter":                {"available": False},
+            "reddit":                 {"available": False},
+            "campaign_score":         0.0,
+            "campaign_indicators":    [],
+            "is_coordinated_campaign": False,
+        }
 
 
 # Example usage

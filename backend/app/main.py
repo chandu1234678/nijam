@@ -25,6 +25,7 @@ from app.routes.quota_routes import router as quota_router
 from app.routes.analytics_routes import router as analytics_router
 from app.routes.audio_routes import router as audio_router
 from app.routes.viral_routes import router as viral_router
+from app.routes.upload_routes import router as upload_router
 from app.health import router as health_router
 from app.middleware import SecurityMiddleware
 
@@ -138,5 +139,6 @@ app.include_router(quota_router)
 app.include_router(analytics_router)
 app.include_router(audio_router)
 app.include_router(viral_router)
+app.include_router(upload_router)
 app.include_router(health_router)
 app.include_router(router)
