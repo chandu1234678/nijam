@@ -83,11 +83,12 @@ async def lifespan(app: FastAPI):
                 logger.warning("ML training failed on startup: %s", e)
 
     # ── Pre-warm sentence-transformers (avoids 30s cold-start on first claim) ─
+    # Only runs if sentence-transformers is installed (not on Render free tier)
     try:
         from app.analysis.semantic_clustering import _get_sentence_transformer
         _get_sentence_transformer()
         logger.info("Sentence-transformers model pre-warmed")
-    except Exception as e:
+    except (ImportError, Exception) as e:
         logger.debug("Sentence-transformers pre-warm skipped: %s", e)
 
     yield
@@ -95,13 +96,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="PiNE AI",
-    version="2.0.0",
+    version="2.6.1",
     lifespan=lifespan,
     description="PiNE AI — AI-powered fact-checking API with ML models, evidence search, and real-time verification",
-    # Docs enabled for development
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    # Disable docs in production for security (set ENABLE_DOCS=true to re-enable)
+    docs_url="/docs" if os.getenv("ENABLE_DOCS", "true").lower() == "true" else None,
+    redoc_url="/redoc" if os.getenv("ENABLE_DOCS", "true").lower() == "true" else None,
+    openapi_url="/openapi.json" if os.getenv("ENABLE_DOCS", "true").lower() == "true" else None,
 )
 
 # ── CORS — only allow extension and known origins ─────────────

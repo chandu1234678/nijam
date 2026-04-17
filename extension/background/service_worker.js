@@ -12,7 +12,8 @@
  */
 
 // ── Backend URL (reads from storage if overridden in settings) ────────────────
-let API_BASE = "http://127.0.0.1:8000";
+// Default points to production Render deployment
+let API_BASE = "https://fake-news-analyzer-j6ka.onrender.com";
 
 chrome.storage.local.get("apiBase", ({ apiBase }) => {
   if (apiBase) API_BASE = apiBase;
