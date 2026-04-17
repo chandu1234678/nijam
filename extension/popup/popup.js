@@ -145,7 +145,7 @@ async function switchSession(id) {
   chrome.storage.local.set({ currentSessionId: id });
   closeSidebar();
   const s = sessions.find(x => x.id === id);
-  if (s) document.getElementById("chat-title").textContent = s.title;
+  if (s) setChatTitle(s.title);
   chatContainer.innerHTML = "";
   await loadSessionMessages(id);
   renderSessions();
@@ -194,7 +194,7 @@ async function newChat() {
   currentSessionId = null;
   history = [];
   chrome.storage.local.remove("currentSessionId");
-  document.getElementById("chat-title").textContent = "PiNE AI";
+  setChatTitle("PiNE AI");
   chatContainer.innerHTML = "";
   showWelcome();
   closeSidebar();
@@ -1204,7 +1204,7 @@ async function send() {
         const displayTitle = fileName
           ? fileName.replace(/\.[^.]+$/, "")  // strip extension
           : s.title;
-        document.getElementById("chat-title").textContent = displayTitle;
+        setChatTitle(displayTitle);
       }
     }
   } catch(err) {
@@ -1215,8 +1215,17 @@ async function send() {
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────
-async function authFetch(path, opts = {}) {
+// Helper — set the header title, preserving PiNE AI brand styling
+function setChatTitle(title) {
+  const el = document.getElementById("chat-title");
+  if (!el) return;
+  if (!title || title === "PiNE AI") {
+    el.innerHTML = '<span class="brand-main">PiNE</span><span class="brand-ai"> AI</span>';
+  } else {
+    // Session title — plain text, no brand styling
+    el.textContent = title;
+  }
+}
   const res = await apiFetch(path, {
     ...opts,
     headers: buildHeaders({
