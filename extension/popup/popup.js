@@ -1226,6 +1226,8 @@ function setChatTitle(title) {
     el.textContent = title;
   }
 }
+
+async function authFetch(path, opts = {}) {
   const res = await apiFetch(path, {
     ...opts,
     headers: buildHeaders({
