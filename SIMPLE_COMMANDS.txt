@@ -1,0 +1,71 @@
+═══════════════════════════════════════════════════════════
+SIMPLE COPY-PASTE COMMANDS - NIjam Project
+═══════════════════════════════════════════════════════════
+
+EVERYONE FIRST:
+───────────────
+cd C:\Users\bc833\Downloads\fake-news-extension
+git init
+git remote add origin https://github.com/chandu1234678/NIjam.git
+
+
+═══════════════════════════════════════════════════════════
+PERSON 1: Chandu (bc833498@gmail.com) - FIRST
+═══════════════════════════════════════════════════════════
+
+git config user.name "Chandu"
+git config user.email "bc833498@gmail.com"
+git add README.md LICENSE .gitignore
+git commit -m "docs: Initialize NIjam - AI-Powered Fact Checker
+
+Co-authored-by: kaushikram51 <kaushikram51@gmail.com>
+Co-authored-by: sb346 <sb346@gmail.com>"
+git push -u origin main
+
+
+═══════════════════════════════════════════════════════════
+PERSON 2: Kaushik (kaushikram51@gmail.com) - SECOND
+═══════════════════════════════════════════════════════════
+
+git config user.name "Kaushik"
+git config user.email "kaushikram51@gmail.com"
+git pull origin main
+git add extension/
+git commit -m "feat: Add Chrome extension UI
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+git push origin main
+
+
+═══════════════════════════════════════════════════════════
+PERSON 3: Abhinav (sb346@gmail.com) - THIRD
+═══════════════════════════════════════════════════════════
+
+git config user.name "Abhinav"
+git config user.email "sb346@gmail.com"
+git pull origin main
+git add backend/ database.py
+git commit -m "feat: Add FastAPI backend with ML pipeline
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Kaushik <kaushikram51@gmail.com>"
+git push origin main
+
+
+═══════════════════════════════════════════════════════════
+PERSON 1: Chandu (bc833498@gmail.com) - FOURTH (FINAL)
+═══════════════════════════════════════════════════════════
+
+git pull origin main
+git add TODO.md EXECUTIVE_SUMMARY.md COMPREHENSIVE_REVIEW.md DEPLOYMENT.md DEPLOYMENT_GUIDE.md TRAINING_GUIDE.md PROJECT_STRUCTURE.md commands.txt render.yaml .vscode/ .kiro/ GIT_COMMIT_STRATEGY.md QUICK_GIT_COMMANDS.txt CONTRIBUTION_PLAN.md TEAM_COMMIT_COMMANDS.md COMMIT_CHECKLIST.txt SIMPLE_COMMANDS.txt
+git commit -m "docs: Add comprehensive documentation
+
+Co-authored-by: kaushikram51 <kaushikram51@gmail.com>
+Co-authored-by: sb346 <sb346@gmail.com>"
+git push origin main
+
+
+═══════════════════════════════════════════════════════════
+DONE! Check: https://github.com/chandu1234678/NIjam
+═══════════════════════════════════════════════════════════

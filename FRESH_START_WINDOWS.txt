@@ -1,0 +1,105 @@
+═══════════════════════════════════════════════════════════
+FRESH START - Windows PowerShell Commands
+═══════════════════════════════════════════════════════════
+
+⚠️ FIRST: Delete the repository on GitHub!
+   1. Go to: https://github.com/chandu1234678/NIjam/settings
+   2. Scroll down → "Delete this repository"
+   3. Type: chandu1234678/NIjam
+   4. Click delete
+   5. Create NEW empty repository with same name: NIjam
+   6. Come back here
+
+
+═══════════════════════════════════════════════════════════
+STEP 1: Chandu - Reset and First Commit
+═══════════════════════════════════════════════════════════
+
+# Remove old git folder
+Remove-Item -Recurse -Force .git
+
+# Start fresh
+git init
+git config user.name "Chandu"
+git config user.email "bc833498@gmail.com"
+
+# Add ONLY README
+git add README.md
+
+# Commit
+git commit -m "docs: Initialize NIjam project
+
+Co-authored-by: Kaushik <kaushikram51@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+
+# Connect to repository
+git remote add origin https://github.com/chandu1234678/NIjam.git
+git branch -M main
+git push -u origin main
+
+✅ DONE! Tell Kaushik to start!
+
+
+═══════════════════════════════════════════════════════════
+STEP 2: Kaushik - Extension
+═══════════════════════════════════════════════════════════
+
+git config user.name "Kaushik"
+git config user.email "kaushikram51@gmail.com"
+git pull origin main
+git add extension/
+git commit -m "feat: Add Chrome extension UI
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+git push origin main
+
+✅ DONE! Tell Abhinav to start!
+
+
+═══════════════════════════════════════════════════════════
+STEP 3: Abhinav - Backend
+═══════════════════════════════════════════════════════════
+
+git config user.name "Abhinav"
+git config user.email "sb346@gmail.com"
+git pull origin main
+git add backend/ database.py
+git commit -m "feat: Add backend API and ML models
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Kaushik <kaushikram51@gmail.com>"
+git push origin main
+
+✅ DONE! Tell Chandu to do final commit!
+
+
+═══════════════════════════════════════════════════════════
+STEP 4: Chandu - Documentation & Config
+═══════════════════════════════════════════════════════════
+
+git pull origin main
+git add .
+git commit -m "docs: Add comprehensive documentation
+
+Co-authored-by: Kaushik <kaushikram51@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+git push origin main
+
+✅ ALL DONE! 🎉
+
+
+═══════════════════════════════════════════════════════════
+RESULT
+═══════════════════════════════════════════════════════════
+
+Visit: https://github.com/chandu1234678/NIjam
+
+You should see:
+✅ 4 commits
+✅ 3 contributors
+✅ Clean history
+✅ Each person contributed
+
+
+═══════════════════════════════════════════════════════════

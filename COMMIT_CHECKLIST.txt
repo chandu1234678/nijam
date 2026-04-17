@@ -1,0 +1,167 @@
+═══════════════════════════════════════════════════════════
+         NIjam PROJECT - COMMIT CHECKLIST
+═══════════════════════════════════════════════════════════
+
+Repository: https://github.com/chandu1234678/NIjam.git
+
+═══════════════════════════════════════════════════════════
+SETUP (Everyone - Do this FIRST!)
+═══════════════════════════════════════════════════════════
+
+cd C:\Users\bc833\Downloads\fake-news-extension
+git init
+git remote add origin https://github.com/chandu1234678/NIjam.git
+git remote -v
+
+
+═══════════════════════════════════════════════════════════
+PERSON 1: Chandu (bc833498@gmail.com) - COMMIT 1
+═══════════════════════════════════════════════════════════
+
+git config user.name "Chandu"
+git config user.email "bc833498@gmail.com"
+
+git add README.md LICENSE .gitignore
+
+git commit -m "docs: Initialize NIjam - AI-Powered Fact Checker
+
+Initial project setup with README, LICENSE, and gitignore.
+
+Co-authored-by: Kaushik <kaushikram51@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+
+git push -u origin main
+
+✅ DONE? Tell Person 2 to start!
+
+
+═══════════════════════════════════════════════════════════
+PERSON 2: Kaushik (kaushikram51@gmail.com) - COMMIT 2
+═══════════════════════════════════════════════════════════
+
+git config user.name "Kaushik"
+git config user.email "kaushikram51@gmail.com"
+
+git pull origin main
+
+git add extension/
+
+git commit -m "feat: Add Chrome extension UI and functionality
+
+- Add extension manifest and popup UI
+- Implement login, dashboard, history, and settings pages
+- Add content script for page interaction
+- Add background service worker with ONNX inference
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+
+git push origin main
+
+✅ DONE? Tell Person 3 to start!
+
+
+═══════════════════════════════════════════════════════════
+PERSON 3: Abhinav (sb346@gmail.com) - COMMIT 3
+═══════════════════════════════════════════════════════════
+
+git config user.name "Abhinav"
+git config user.email "sb346@gmail.com"
+
+git pull origin main
+
+git add backend/ database.py
+
+git commit -m "feat: Add FastAPI backend with ML pipeline
+
+Backend API with 20+ endpoints, JWT auth, PostgreSQL database,
+ML pipeline with 96.63% accuracy, evidence search, AI analysis,
+and real-time WebSocket support.
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Kaushik <kaushikram51@gmail.com>"
+
+git push origin main
+
+✅ DONE? Tell Person 1 to do final commit!
+
+
+═══════════════════════════════════════════════════════════
+PERSON 1: Chandu (bc833498@gmail.com) - COMMIT 4
+═══════════════════════════════════════════════════════════
+
+git pull origin main
+
+git add TODO.md EXECUTIVE_SUMMARY.md COMPREHENSIVE_REVIEW.md DEPLOYMENT.md DEPLOYMENT_GUIDE.md TRAINING_GUIDE.md PROJECT_STRUCTURE.md commands.txt render.yaml .vscode/ .kiro/ GIT_COMMIT_STRATEGY.md QUICK_GIT_COMMANDS.txt CONTRIBUTION_PLAN.md
+
+git commit -m "docs: Add comprehensive project documentation
+
+- Add TODO roadmap with 280+ tasks
+- Add deployment and training guides
+- Add project structure documentation
+- Add git contribution guides
+
+Co-authored-by: Kaushik <kaushikram51@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+
+git push origin main
+
+✅ ALL DONE! 🎉
+
+
+═══════════════════════════════════════════════════════════
+VERIFY (Everyone can check)
+═══════════════════════════════════════════════════════════
+
+git log --oneline
+git shortlog -sn
+
+Expected: 4 commits, 3 contributors
+
+
+═══════════════════════════════════════════════════════════
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════
+
+Problem: "remote origin already exists"
+Fix: git remote remove origin
+     git remote add origin https://github.com/chandu1234678/NIjam.git
+
+Problem: "Permission denied"
+Fix: Check collaborators at:
+     https://github.com/chandu1234678/NIjam/settings/access
+
+Problem: "Merge conflict"
+Fix: git pull origin main
+     (then try push again)
+
+Problem: "Nothing to commit"
+Fix: git status
+     (make sure you ran git add)
+
+
+═══════════════════════════════════════════════════════════
+TIMELINE
+═══════════════════════════════════════════════════════════
+
+0:00 - Person 1 (Chandu) pushes README
+0:02 - Person 2 (Kaushik) pushes extension
+0:07 - Person 3 (Abhinav) pushes backend
+0:12 - Person 1 (Chandu) pushes docs
+0:15 - COMPLETE! ✅
+
+
+═══════════════════════════════════════════════════════════
+FINAL CHECK
+═══════════════════════════════════════════════════════════
+
+Visit: https://github.com/chandu1234678/NIjam
+
+Should see:
+✅ 4 commits
+✅ 3 contributors
+✅ ~220 files
+✅ Professional structure
+
+
+═══════════════════════════════════════════════════════════

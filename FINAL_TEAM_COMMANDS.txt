@@ -1,0 +1,136 @@
+═══════════════════════════════════════════════════════════
+         NIjam PROJECT - FINAL COMMANDS
+═══════════════════════════════════════════════════════════
+
+Repository: https://github.com/chandu1234678/NIjam.git
+
+Team:
+1. Chandu (bc833498@gmail.com) - Project Lead
+2. Kaushik (kaushikram51@gmail.com) - Frontend Developer
+3. Abhinav (sb346@gmail.com) - Backend Developer
+
+
+═══════════════════════════════════════════════════════════
+SETUP (Everyone does this FIRST!)
+═══════════════════════════════════════════════════════════
+
+cd C:\Users\bc833\Downloads\fake-news-extension
+git init
+git remote add origin https://github.com/chandu1234678/NIjam.git
+git remote -v
+
+
+═══════════════════════════════════════════════════════════
+PERSON 1: Chandu - FIRST COMMIT
+═══════════════════════════════════════════════════════════
+
+git config user.name "Chandu"
+git config user.email "bc833498@gmail.com"
+
+git add README.md LICENSE .gitignore
+
+git commit -m "docs: Initialize NIjam - AI-Powered Fact Checker
+
+Co-authored-by: Kaushik <kaushikram51@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+
+git push -u origin main
+
+✅ DONE? Tell Kaushik to start!
+
+
+═══════════════════════════════════════════════════════════
+PERSON 2: Kaushik - SECOND COMMIT
+═══════════════════════════════════════════════════════════
+
+git config user.name "Kaushik"
+git config user.email "kaushikram51@gmail.com"
+
+git pull origin main
+
+git add extension/
+
+git commit -m "feat: Add Chrome extension UI
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+
+git push origin main
+
+✅ DONE? Tell Abhinav to start!
+
+
+═══════════════════════════════════════════════════════════
+PERSON 3: Abhinav - THIRD COMMIT
+═══════════════════════════════════════════════════════════
+
+git config user.name "Abhinav"
+git config user.email "sb346@gmail.com"
+
+git pull origin main
+
+git add backend/ database.py
+
+git commit -m "feat: Add FastAPI backend with ML pipeline
+
+Co-authored-by: Chandu <bc833498@gmail.com>
+Co-authored-by: Kaushik <kaushikram51@gmail.com>"
+
+git push origin main
+
+✅ DONE? Tell Chandu to do final commit!
+
+
+═══════════════════════════════════════════════════════════
+PERSON 1: Chandu - FOURTH COMMIT (FINAL)
+═══════════════════════════════════════════════════════════
+
+git pull origin main
+
+git add TODO.md EXECUTIVE_SUMMARY.md COMPREHENSIVE_REVIEW.md DEPLOYMENT.md DEPLOYMENT_GUIDE.md TRAINING_GUIDE.md PROJECT_STRUCTURE.md commands.txt render.yaml .vscode/ .kiro/ GIT_COMMIT_STRATEGY.md QUICK_GIT_COMMANDS.txt CONTRIBUTION_PLAN.md TEAM_COMMIT_COMMANDS.md COMMIT_CHECKLIST.txt SIMPLE_COMMANDS.txt FINAL_TEAM_COMMANDS.txt
+
+git commit -m "docs: Add comprehensive documentation
+
+Co-authored-by: Kaushik <kaushikram51@gmail.com>
+Co-authored-by: Abhinav <sb346@gmail.com>"
+
+git push origin main
+
+✅ ALL DONE! 🎉
+
+
+═══════════════════════════════════════════════════════════
+VERIFY
+═══════════════════════════════════════════════════════════
+
+git log --oneline
+git shortlog -sn
+
+Expected: 4 commits, 3 contributors
+
+
+═══════════════════════════════════════════════════════════
+TIMELINE
+═══════════════════════════════════════════════════════════
+
+0:00 - Chandu pushes README
+0:02 - Kaushik pushes extension
+0:07 - Abhinav pushes backend
+0:12 - Chandu pushes docs
+0:15 - COMPLETE! ✅
+
+
+═══════════════════════════════════════════════════════════
+CHECK RESULT
+═══════════════════════════════════════════════════════════
+
+Visit: https://github.com/chandu1234678/NIjam
+
+Should see:
+✅ 4 commits
+✅ 3 contributors (Chandu, Kaushik, Abhinav)
+✅ ~220 files
+✅ Professional structure
+
+
+═══════════════════════════════════════════════════════════
