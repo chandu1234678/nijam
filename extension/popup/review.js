@@ -1,26 +1,13 @@
 // Review Queue - Active Learning Interface
+// API, apiFetch, buildHeaders, readJsonSafe are defined in config.js (loaded first)
 
 let currentFilter = "all";
 let reviewQueue = [];
 let stats = null;
 
-// Helper functions
+// Helper
 function esc(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
-function buildHeaders(extra = {}) {
-  return { ...extra };
-}
-
-async function apiFetch(path, opts = {}) {
-  const url = `${API_BASE}${path}`;
-  const res = await fetch(url, opts);
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err || res.statusText);
-  }
-  return res.json();
 }
 
 // Navigation
@@ -54,10 +41,11 @@ async function loadStats() {
     stats = await apiFetch("/review/stats", {
       headers: buildHeaders({ "Authorization": `Bearer ${token}` })
     });
+    const statsData = await readJsonSafe(stats) || {};
 
-    document.getElementById("stat-pending").textContent = stats.total_pending;
-    document.getElementById("stat-today").textContent = stats.reviewed_today;
-    document.getElementById("stat-priority").textContent = stats.high_priority_count;
+    document.getElementById("stat-pending").textContent = statsData.total_pending ?? "-";
+    document.getElementById("stat-today").textContent   = statsData.reviewed_today ?? "-";
+    document.getElementById("stat-priority").textContent = statsData.high_priority_count ?? "-";
   } catch (e) {
     console.error("Failed to load stats:", e);
   }
@@ -79,9 +67,11 @@ async function loadReviewQueue() {
       return;
     }
 
-    reviewQueue = await apiFetch(`/review/queue?priority=${currentFilter}&limit=20`, {
+    const res = await apiFetch(`/review/queue?priority=${currentFilter}&limit=20`, {
       headers: buildHeaders({ "Authorization": `Bearer ${token}` })
     });
+    if (res.status === 401) { window.location.href = chrome.runtime.getURL("popup/login.html"); return; }
+    reviewQueue = await readJsonSafe(res) || [];
 
     if (reviewQueue.length === 0) {
       content.innerHTML = `
@@ -232,10 +222,7 @@ async function submitReview(claimId, verdict, cardElement) {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
       }),
-      body: JSON.stringify({
-        claim_id: claimId,
-        verdict: verdict
-      })
+      body: JSON.stringify({ claim_id: claimId, verdict })
     });
 
     // Show success feedback
