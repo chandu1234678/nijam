@@ -12,18 +12,14 @@ import logging
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from dotenv import load_dotenv
 from app.analysis.credibility import get_trust_score, get_trust_label
 from app.analysis.publisher_bias import get_bias_label, get_bias_weight
 
-_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
-load_dotenv(_env_path)
-
 logger = logging.getLogger(__name__)
 
-NEWS_API_KEY  = os.getenv("NEWS_API_KEY")
-BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
-NEWS_API_URL  = "https://newsapi.org/v2/everything"
+NEWS_API_KEY   = os.getenv("NEWS_API_KEY")
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+NEWS_API_URL   = "https://newsapi.org/v2/everything"
 
 # ── Reusable session with retry ───────────────────────────────
 _retry_strategy = Retry(
@@ -61,10 +57,6 @@ _CONTRADICT_WORDS = re.compile(
     r"fact.?check|not true|baseless|fabricat|manipulat)\b",
     re.IGNORECASE,
 )
-
-
-def normalize(text: str) -> str:
-    return text.lower().strip()
 
 
 def _stance(title: str, description: str) -> str:
@@ -112,10 +104,10 @@ def fetch_evidence(text: str):
                 cached.get("articles", [])
             )
     except Exception as e:
-        logger.debug(f"Cache lookup failed: {e}")
-    
+        logger.debug("Cache lookup failed: %s", e)
+
     # Try Brave first (real-time)
-    if BRAVE_API_KEY:
+    if TAVILY_API_KEY:
         try:
             from app.analysis.brave_search import fetch_brave_evidence
             score, urls, articles = fetch_brave_evidence(text)
@@ -130,14 +122,14 @@ def fetch_evidence(text: str):
                         "articles": articles
                     })
                 except Exception as e:
-                    logger.debug(f"Cache set failed: {e}")
+                    logger.debug("Cache set failed: %s", e)
                 return score, urls, articles
         except Exception as e:
             logger.warning("Brave Search failed, falling back to NewsAPI: %s", e)
 
     # Fallback to NewsAPI
     score, urls, articles = _fetch_newsapi_evidence(text)
-    
+
     # Cache the result
     if score is not None:
         try:
@@ -148,10 +140,9 @@ def fetch_evidence(text: str):
                 "articles": articles
             })
         except Exception as e:
-            logger.debug(f"Cache set failed: {e}")
-    
-    return score, urls, articles
+            logger.debug("Cache set failed: %s", e)
 
+    return score, urls, articles
 
 
 def _fetch_newsapi_evidence(text: str):
@@ -194,8 +185,8 @@ def _fetch_newsapi_evidence(text: str):
             title    = a.get("title") or ""
             desc     = a.get("description") or ""
             src      = a.get("source", {})
-            src_id   = normalize(src.get("id")   or "")
-            src_name = normalize(src.get("name") or "")
+            src_id   = (src.get("id") or "").lower().strip()
+            src_name = (src.get("name") or "").lower().strip()
 
             if url and url != "[Removed]":
                 all_urls.append(url)

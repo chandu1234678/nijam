@@ -1,12 +1,18 @@
+from __future__ import annotations
+
 import os
 import re
 import json
+import logging
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Optional, Tuple
 from dotenv import load_dotenv
 
 _env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
 load_dotenv(_env_path)
+
+logger = logging.getLogger(__name__)
 
 CEREBRAS_URL  = "https://api.cerebras.ai/v1/chat/completions"
 GROQ_URL      = "https://api.groq.com/openai/v1/chat/completions"
@@ -34,14 +40,20 @@ Rules:
 - explanation must be factual, calm, and natural — no AI disclaimers
 - Do NOT include markdown fences or any text outside the JSON"""
 
+# ── Cached API keys (lazy init) ───────────────────────────────
+_KEYS: Optional[dict] = None
 
-def _get_keys():
-    return {
-        "cerebras": os.getenv("CEREBRAS_API_KEY"),
-        "groq":     os.getenv("GROQ_API_KEY"),
-        "gemini":   os.getenv("GEMINI_API_KEY"),
-        "minimax":  os.getenv("MINIMAX_API_KEY"),
-    }
+
+def _get_keys() -> dict:
+    global _KEYS
+    if _KEYS is None:
+        _KEYS = {
+            "cerebras": os.getenv("CEREBRAS_API_KEY"),
+            "groq":     os.getenv("GROQ_API_KEY"),
+            "gemini":   os.getenv("GEMINI_API_KEY"),
+            "minimax":  os.getenv("MINIMAX_API_KEY"),
+        }
+    return _KEYS
 
 
 def _parse_structured(raw: str) -> dict:
@@ -62,50 +74,40 @@ def _verdict_to_score(verdict: str) -> float:
     return 0.5
 
 
-def _call_cerebras(text: str) -> dict:
-    key = _get_keys()["cerebras"]
-    if not key:
-        raise ValueError("Cerebras API key missing")
+def _call_openai_compat(url: str, key: str, model: str, text: str,
+                         timeout: int = 12, max_tokens: int = 300) -> dict:
+    """Shared helper for OpenAI-compatible chat completion endpoints."""
     r = requests.post(
-        CEREBRAS_URL,
+        url,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         json={
-            "model": "llama3.1-8b",
+            "model": model,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user",   "content": f"Claim: {text}"}
             ],
             "temperature": 0.1,
-            "max_tokens": 300,
+            "max_tokens": max_tokens,
         },
-        timeout=12
+        timeout=timeout,
     )
     r.raise_for_status()
     raw = r.json()["choices"][0]["message"]["content"].strip()
     return _parse_structured(raw)
+
+
+def _call_cerebras(text: str) -> dict:
+    key = _get_keys()["cerebras"]
+    if not key:
+        raise ValueError("Cerebras API key missing")
+    return _call_openai_compat(CEREBRAS_URL, key, "llama3.1-8b", text)
 
 
 def _call_groq(text: str) -> dict:
     key = _get_keys()["groq"]
     if not key:
         raise ValueError("Groq API key missing")
-    r = requests.post(
-        GROQ_URL,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={
-            "model": "llama3-8b-8192",
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": f"Claim: {text}"}
-            ],
-            "temperature": 0.1,
-            "max_tokens": 300,
-        },
-        timeout=12
-    )
-    r.raise_for_status()
-    raw = r.json()["choices"][0]["message"]["content"].strip()
-    return _parse_structured(raw)
+    return _call_openai_compat(GROQ_URL, key, "llama3-8b-8192", text)
 
 
 def _call_gemini(text: str) -> dict:
@@ -139,23 +141,8 @@ def _call_minimax(text: str) -> dict:
 
     for model in ["MiniMax-M2.7", "MiniMax-M2.7-highspeed"]:
         try:
-            r = requests.post(
-                MINIMAX_URL,
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-                json={
-                    "model": model,
-                    "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user",   "content": f"Claim: {text}"}
-                    ],
-                    "temperature": 0.1,
-                    "max_tokens": 500,
-                },
-                timeout=20
-            )
-            r.raise_for_status()
-            raw = r.json()["choices"][0]["message"]["content"].strip()
-            return _parse_structured(raw)
+            return _call_openai_compat(MINIMAX_URL, key, model, text,
+                                       timeout=20, max_tokens=500)
         except Exception:
             continue
     raise ValueError("MiniMax M2.7 and M2.7-highspeed both failed")
@@ -196,7 +183,7 @@ def _call_gemma4(text: str) -> dict:
     raise ValueError("Gemma 4 31B / Gemma 3 27B / Gemini Flash all failed")
 
 
-def _ensemble_vote(results: list[dict]) -> dict:
+def _ensemble_vote(results: List[dict]) -> dict:
     """
     Weighted ensemble voting across multiple LLM verdicts.
     
@@ -302,18 +289,15 @@ def run_ai_analysis(text: str):
 
     Returns: (ai_fake_score: float | None, explanation: str)
     """
-    import logging
-    log = logging.getLogger(__name__)
-
     # Try cache first
     try:
         from app.cache import partial_cache
         cached = partial_cache.get_ai_score(text)
         if cached is not None:
-            log.debug("AI analysis cache hit")
+            logger.debug("AI analysis cache hit")
             return cached.get("score"), cached.get("explanation", "")
     except Exception as e:
-        log.debug(f"Cache lookup failed: {e}")
+        logger.debug("Cache lookup failed: %s", e)
 
     successes, errors = _run_all_parallel(text)
 
@@ -335,7 +319,7 @@ def run_ai_analysis(text: str):
     elif verdict == "real":
         score = min(score, 1.0 - llm_conf * 0.95)
 
-    log.info(
+    logger.info(
         "AI ensemble: verdict=%s conf=%.2f score=%.3f providers=%s errors=%s",
         verdict, llm_conf, score,
         [r.get("_source") for r in successes],
@@ -347,6 +331,6 @@ def run_ai_analysis(text: str):
         from app.cache import partial_cache
         partial_cache.set_ai_score(text, score, explanation)
     except Exception as e:
-        log.debug(f"Cache set failed: {e}")
+        logger.debug("Cache set failed: %s", e)
 
     return score, explanation

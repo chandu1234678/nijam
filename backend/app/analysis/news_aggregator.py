@@ -13,14 +13,13 @@ Sources:
 - Reddit API (cross-post tracking)
 - RSS feeds (BBC, Reuters, AP — no key needed)
 """
+from __future__ import annotations
 
 import os
-import re
 import time
 import logging
-import hashlib
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
