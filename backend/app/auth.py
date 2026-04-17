@@ -21,6 +21,7 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)  # Don't raise error if no token
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -45,7 +46,12 @@ def decode_token(token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired"
         )
-    except jwt.JWTError:
+    except jwt.InvalidSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token signature"
+        )
+    except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
@@ -116,16 +122,24 @@ async def get_current_user_ws(token: str, db: Session = None) -> User:
 
 
 def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
-    """Get the current user if authenticated, otherwise return None"""
+    """Get the current user if authenticated, otherwise return None (allows anonymous access)"""
     if not credentials:
         return None
     
     try:
-        return get_current_user(credentials, db)
-    except HTTPException:
+        token = credentials.credentials
+        payload = decode_token(token)
+        
+        user_id = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        return user
+    except:
         return None
 
 

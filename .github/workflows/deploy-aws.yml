@@ -1,0 +1,164 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run stress tests
+        run: |
+          cd backend
+          # Start server in background
+          uvicorn app.main:app --port 8000 &
+          SERVER_PID=$!
+          
+          # Wait for server to start
+          sleep 10
+          
+          # Run tests
+          python tests/stress_test.py http://localhost:8000
+          
+          # Stop server
+          kill $SERVER_PID
+        env:
+          DATABASE_URL: sqlite:///./test.db
+          JWT_SECRET: test_secret_key_for_ci
+          DEBERTA_MODEL: ""
+          FORCE_TRANSFORMER_LOAD: "false"
+
+  deploy:
+    name: Deploy to AWS
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ubuntu
+          EC2_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          # Save SSH key
+          echo "$EC2_KEY" > ec2_key.pem
+          chmod 400 ec2_key.pem
+          
+          # Deploy via SSH
+          ssh -i ec2_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
+            cd ~/nijam
+            
+            # Pull latest code
+            git pull origin main
+            
+            # Activate virtual environment
+            cd backend
+            source venv/bin/activate
+            
+            # Install/update dependencies
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            
+            # Run database migrations
+            alembic upgrade head
+            
+            # Restart service
+            sudo systemctl restart nijam
+            
+            # Check status
+            sleep 5
+            sudo systemctl status nijam --no-pager
+            
+            # Test health endpoint
+            curl -f http://localhost:8000/health || exit 1
+            
+            echo "✅ Deployment successful!"
+          EOF
+          
+          # Cleanup
+          rm ec2_key.pem
+      
+      - name: Verify deployment
+        run: |
+          # Wait for service to stabilize
+          sleep 10
+          
+          # Test public endpoint
+          curl -f http://${{ secrets.EC2_HOST }}/health
+          
+          echo "✅ Deployment verified!"
+      
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "🎉 Deployment to AWS successful!"
+          echo "API: http://${{ secrets.EC2_HOST }}"
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Check logs above."
+          exit 1
+
+  rollback:
+    name: Rollback on Failure
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+      - name: Rollback deployment
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ubuntu
+          EC2_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          echo "$EC2_KEY" > ec2_key.pem
+          chmod 400 ec2_key.pem
+          
+          ssh -i ec2_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
+            cd ~/nijam
+            
+            # Rollback to previous commit
+            git reset --hard HEAD~1
+            
+            # Restart service
+            cd backend
+            source venv/bin/activate
+            sudo systemctl restart nijam
+            
+            echo "⚠️ Rolled back to previous version"
+          EOF
+          
+          rm ec2_key.pem

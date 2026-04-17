@@ -1847,3 +1847,55 @@ textarea#input-text::-webkit-scrollbar { display: none; }
   pointer-events: auto;
   opacity: 1;
 }
+
+/* Voice recording pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Voice button recording state */
+#voice-btn.recording {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* ── Viral/Trending Badges (Phase 2) ── */
+.viral-alert-badge {
+  background: linear-gradient(135deg, rgba(245, 87, 108, 0.2), rgba(245, 87, 108, 0.1));
+  border: 1px solid rgba(245, 87, 108, 0.4);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f5576c;
+  animation: pulse-viral 2s ease-in-out infinite;
+}
+
+.trending-badge {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.2), rgba(255, 152, 0, 0.1));
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ff9800;
+}
+
+@keyframes pulse-viral {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.02); }
+}

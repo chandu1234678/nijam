@@ -76,16 +76,36 @@ _BIAS_DB: Dict[str, str] = {
     "france24.com":         "CENTER",
     "abc.net.au":           "CENTER",
     "cbc.ca":               "LEFT-CENTER",
+    "rfi.fr":               "CENTER",
+    "euronews.com":         "CENTER",
+    "theconversation.com":  "CENTER",
+    # INDIAN
     "thehindu.com":         "LEFT-CENTER",
     "ndtv.com":             "CENTER",
     "hindustantimes.com":   "CENTER",
     "indiatoday.in":        "CENTER",
     "timesofindia.com":     "CENTER",
+    "thewire.in":           "LEFT",
+    "scroll.in":            "LEFT-CENTER",
+    "theprint.in":          "CENTER",
+    "opindia.com":          "RIGHT",
+    "swarajyamag.com":      "RIGHT",
+    # INDIAN FACT-CHECKERS
+    "boomlive.in":          "CENTER",
+    "altnews.in":           "CENTER",
+    "vishvasnews.com":      "CENTER",
+    "africacheck.org":      "CENTER",
+    # STATE MEDIA
     "rt.com":               "STATE-MEDIA",
     "xinhuanet.com":        "STATE-MEDIA",
     "cgtn.com":             "STATE-MEDIA",
     "tass.com":             "STATE-MEDIA",
     "sputniknews.com":      "STATE-MEDIA",
+    "globaltimes.cn":       "STATE-MEDIA",
+    "presstv.ir":           "STATE-MEDIA",
+    # REFERENCE
+    "wikipedia.org":        "CENTER",
+    "britannica.com":       "CENTER",
 }
 
 # Bias risk weights — how much to penalize evidence from biased sources

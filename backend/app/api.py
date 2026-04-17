@@ -377,6 +377,7 @@ def message(
         ai_fake=ai_score,
         evidence_score=evidence_score,
         text_len=len(primary_claim),
+        manip_score=manip_score,
     )
 
     # If already debunked by fact-checkers, override to fake with high confidence
@@ -649,17 +650,17 @@ def message(
             logger.warning("Failed to save assistant message: %s", e)
     
     # ── WebSocket notification ────────────────────────────────
-    if user:
-        from app.websocket import notify_claim_verified
-        import asyncio
-        try:
-            # Create task to send notification without blocking response
-            asyncio.create_task(notify_claim_verified(user.id, {
-                "verdict": verdict,
-                "confidence": confidence,
-                "claim_text": primary_claim[:200]
-            }))
-        except Exception as e:
-            logger.debug(f"WebSocket notification skipped: {e}")
+    # Disabled for now - causes asyncio warnings in sync context
+    # if user:
+    #     from app.websocket import notify_claim_verified
+    #     import asyncio
+    #     try:
+    #         asyncio.create_task(notify_claim_verified(user.id, {
+    #             "verdict": verdict,
+    #             "confidence": confidence,
+    #             "claim_text": primary_claim[:200]
+    #         }))
+    #     except Exception as e:
+    #         logger.debug(f"WebSocket notification skipped: {e}")
 
     return result

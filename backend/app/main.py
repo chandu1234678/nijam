@@ -1,9 +1,13 @@
 import os
 import logging
 import json
+import warnings
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Suppress scikit-learn version warnings (models trained on 1.6.1)
+warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
 
 from database import engine, Base
 import app.models  # register models
@@ -19,6 +23,8 @@ from app.routes.websocket_routes import router as websocket_router
 from app.routes.cache_routes import router as cache_router
 from app.routes.quota_routes import router as quota_router
 from app.routes.analytics_routes import router as analytics_router
+from app.routes.audio_routes import router as audio_router
+from app.routes.viral_routes import router as viral_router
 from app.health import router as health_router
 from app.middleware import SecurityMiddleware
 
@@ -74,6 +80,15 @@ async def lifespan(app: FastAPI):
                 logger.info("ML model trained on startup")
             except Exception as e:
                 logger.warning("ML training failed on startup: %s", e)
+
+    # ── Pre-warm sentence-transformers (avoids 30s cold-start on first claim) ─
+    try:
+        from app.analysis.semantic_clustering import _get_sentence_transformer
+        _get_sentence_transformer()
+        logger.info("Sentence-transformers model pre-warmed")
+    except Exception as e:
+        logger.debug("Sentence-transformers pre-warm skipped: %s", e)
+
     yield
 
 
@@ -121,5 +136,7 @@ app.include_router(websocket_router)
 app.include_router(cache_router)
 app.include_router(quota_router)
 app.include_router(analytics_router)
+app.include_router(audio_router)
+app.include_router(viral_router)
 app.include_router(health_router)
 app.include_router(router)

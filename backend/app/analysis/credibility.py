@@ -39,23 +39,38 @@ _STATIC_TRUST: Dict[str, float] = {
     "who.int":              0.95,
     "cdc.gov":              0.95,
     "nih.gov":              0.95,
+    "pubmed.ncbi.nlm.nih.gov": 0.95,
+    "thelancet.com":        0.94,
+    "nejm.org":             0.94,
+    "bmj.com":              0.93,
+    "sciencedirect.com":    0.90,
     # Tier 1 — fact-checkers
     "snopes.com":           0.92,
     "factcheck.org":        0.92,
     "politifact.com":       0.91,
     "fullfact.org":         0.91,
+    "africacheck.org":      0.90,
+    "boomlive.in":          0.88,
+    "altnews.in":           0.87,
+    "vishvasnews.com":      0.85,
     # Tier 2 — international
     "aljazeera.com":        0.82,
     "dw.com":               0.85,
     "france24.com":         0.84,
     "abc.net.au":           0.85,
     "cbc.ca":               0.85,
+    "rfi.fr":               0.83,
+    "euronews.com":         0.80,
+    "theconversation.com":  0.88,
     # Tier 2 — Indian
     "thehindu.com":         0.83,
     "ndtv.com":             0.78,
     "hindustantimes.com":   0.76,
     "indiatoday.in":        0.74,
     "timesofindia.com":     0.72,
+    "thewire.in":           0.78,
+    "scroll.in":            0.77,
+    "theprint.in":          0.76,
     # Tier 3 — general news
     "nbcnews.com":          0.80,
     "abcnews.go.com":       0.80,
@@ -66,6 +81,15 @@ _STATIC_TRUST: Dict[str, float] = {
     "breitbart.com":        0.30,
     "infowars.com":         0.10,
     "naturalnews.com":      0.10,
+    # State media (low trust — state-controlled)
+    "rt.com":               0.25,
+    "xinhuanet.com":        0.25,
+    "cgtn.com":             0.25,
+    "tass.com":             0.25,
+    "sputniknews.com":      0.20,
+    # Wikipedia / reference
+    "wikipedia.org":        0.75,
+    "britannica.com":       0.85,
 }
 
 # In-memory learned adjustments: domain → cumulative delta

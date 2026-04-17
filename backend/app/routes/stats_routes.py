@@ -30,7 +30,9 @@ def _model_version() -> dict:
     return {"version": "unknown"}
 
 
-@router.get("/system")
+@router.get("")          # GET /stats
+@router.get("/")         # GET /stats/
+@router.get("/system")   # GET /stats/system  (backward compat)
 def system_stats(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional),

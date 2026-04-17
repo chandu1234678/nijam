@@ -7,6 +7,9 @@ Analyzes claim text for patterns associated with misinformation:
   - Absolute / exaggerated claims
   - Urgency / fear triggers
   - Unverified attribution ("sources say", "they don't want you to know")
+  - Conspiracy language patterns
+  - Coordinated inauthentic behavior signals
+  - Numeric exaggeration (100%, all, zero)
 
 Returns a score 0.0–1.0 and a list of detected signals.
 """
@@ -20,7 +23,8 @@ SENSATIONAL = re.compile(
     r"\b(shocking|bombshell|explosive|breaking|exposed|leaked|scandal|"
     r"outrage|unbelievable|jaw.?dropping|mind.?blowing|stunning|"
     r"you won.?t believe|nobody is talking about|they don.?t want you to know|"
-    r"the truth about|what they.?re hiding|wake up|open your eyes)\b",
+    r"the truth about|what they.?re hiding|wake up|open your eyes|"
+    r"mainstream media won.?t|censored|banned|suppressed|silenced)\b",
     re.IGNORECASE
 )
 
@@ -28,14 +32,16 @@ EMOTIONAL = re.compile(
     r"\b(terrifying|horrifying|disgusting|enraging|heartbreaking|"
     r"devastating|catastrophic|apocalyptic|evil|corrupt|criminal|"
     r"destroy|collapse|crisis|disaster|threat|danger|attack|"
-    r"panic|fear|chaos|violence|war|death|kill|murder)\b",
+    r"panic|fear|chaos|violence|war|death|kill|murder|"
+    r"genocide|tyranny|oppression|enslave|brainwash)\b",
     re.IGNORECASE
 )
 
 ABSOLUTE = re.compile(
     r"\b(always|never|everyone|nobody|all|none|every single|"
-    r"100 percent|completely|totally|absolutely|proven fact|"
-    r"undeniable|irrefutable|definitive proof|confirmed by all)\b",
+    r"100 percent|100%|completely|totally|absolutely|proven fact|"
+    r"undeniable|irrefutable|definitive proof|confirmed by all|"
+    r"without exception|universally|invariably)\b",
     re.IGNORECASE
 )
 
@@ -43,14 +49,32 @@ UNVERIFIED_ATTRIBUTION = re.compile(
     r"\b(sources say|insiders claim|anonymous sources|"
     r"reportedly|allegedly|rumored|unconfirmed|"
     r"according to some|many people are saying|"
-    r"experts warn|scientists fear|officials admit)\b",
+    r"experts warn|scientists fear|officials admit|"
+    r"whistleblower|leaked documents|classified info)\b",
     re.IGNORECASE
 )
 
 URGENCY = re.compile(
     r"\b(urgent|act now|share immediately|spread the word|"
     r"before it.?s deleted|before they remove|"
-    r"limited time|must see|must read|do this now)\b",
+    r"limited time|must see|must read|do this now|"
+    r"repost before|share before|going viral|share this)\b",
+    re.IGNORECASE
+)
+
+CONSPIRACY = re.compile(
+    r"\b(deep state|new world order|illuminati|cabal|globalist|"
+    r"false flag|crisis actor|plandemic|scamdemic|"
+    r"microchip|5g|chemtrail|flat earth|lizard people|"
+    r"great reset|agenda 21|agenda 2030|depopulation|"
+    r"big pharma|big tech|shadow government|secret society)\b",
+    re.IGNORECASE
+)
+
+NUMERIC_EXAGGERATION = re.compile(
+    r"\b(million(s)? of people|billion(s)? of people|"
+    r"thousands? of (doctors?|scientists?|experts?)|"
+    r"99(\.\d+)?%|98(\.\d+)?%|zero (deaths?|cases?|evidence))\b",
     re.IGNORECASE
 )
 
@@ -69,6 +93,8 @@ def analyze_manipulation(text: str) -> Tuple[float, List[str]]:
     a = len(ABSOLUTE.findall(text))
     u = len(UNVERIFIED_ATTRIBUTION.findall(text))
     g = len(URGENCY.findall(text))
+    c = len(CONSPIRACY.findall(text))
+    n = len(NUMERIC_EXAGGERATION.findall(text))
 
     if s > 0:
         signals.append("sensational language")
@@ -89,6 +115,14 @@ def analyze_manipulation(text: str) -> Tuple[float, List[str]]:
     if g > 0:
         signals.append("urgency trigger")
         weights.append(min(g * 0.20, 0.30))
+
+    if c > 0:
+        signals.append("conspiracy language")
+        weights.append(min(c * 0.25, 0.50))  # conspiracy is a strong signal
+
+    if n > 0:
+        signals.append("numeric exaggeration")
+        weights.append(min(n * 0.10, 0.20))
 
     score = round(min(sum(weights), 1.0), 2)
     return score, signals

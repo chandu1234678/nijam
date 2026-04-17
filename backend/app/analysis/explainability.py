@@ -63,6 +63,11 @@ def build_explanation(
     key_factors = []
 
     # ── ML signal ─────────────────────────────────────────────
+    # Handle NaN or None values from ML model
+    import math
+    if ml_score is None or (isinstance(ml_score, float) and math.isnan(ml_score)):
+        ml_score = 0.5  # Default to uncertain if ML fails
+    
     ml_interp = (
         f"The text pattern analysis rates this as {_score_to_label(ml_score)} "
         f"({round(ml_score * 100)}% fake probability). "

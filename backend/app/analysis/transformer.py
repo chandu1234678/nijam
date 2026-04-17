@@ -29,9 +29,10 @@ class TransformerClassifier:
                        If None, uses default HF model or local path.
         """
         if model_path is None:
-            # Try HuggingFace Hub first, then local path
-            # Your uploaded model ID
-            model_path = "Bharat2004/deberta-fakenews-detector"
+            # Arko007/fact-check1-v3-final — DeBERTa-v3-large, 99.98% accuracy,
+            # calibrated on scientific facts + fake news, MIT license.
+            # Override with DEBERTA_MODEL env var to use your own fine-tuned model.
+            model_path = "Arko007/fact-check1-v3-final"
             # Fallback to local path if HF model not found
             self.fallback_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -48,23 +49,34 @@ class TransformerClassifier:
         """Load transformer model from HuggingFace Hub or local disk"""
         try:
             from transformers import pipeline
+            import os
+            
+            # Get HF token from environment
+            hf_token = os.getenv("HF_TOKEN")
+            if hf_token:
+                logger.info("Using HuggingFace token for model download")
+            
+            # Get model name from environment or use default
+            model_name = os.getenv("DEBERTA_MODEL", self.model_path)
+            logger.info(f"Loading model: {model_name}")
             
             # Try loading from HuggingFace Hub or local path
             try:
                 device = 0 if torch.cuda.is_available() else -1
                 self.classifier = pipeline(
                     "text-classification",
-                    model=self.model_path,
+                    model=model_name,
+                    token=hf_token,  # Use HF token for private/gated models
                     device=device,
                     truncation=True,
                     max_length=512
                 )
-                logger.info(f"Transformer model loaded from {self.model_path}")
-                logger.info(f"Device: {'GPU' if device == 0 else 'CPU'}")
+                logger.info(f"✓ Transformer model loaded: {model_name}")
+                logger.info(f"  Device: {'GPU (CUDA)' if device == 0 else 'CPU'}")
                 return
                 
             except Exception as e:
-                logger.warning(f"Failed to load from {self.model_path}: {e}")
+                logger.warning(f"Failed to load from {model_name}: {e}")
                 
                 # Try fallback local path if available
                 if self.fallback_path and os.path.exists(self.fallback_path):
@@ -77,8 +89,8 @@ class TransformerClassifier:
                         truncation=True,
                         max_length=512
                     )
-                    logger.info(f"Transformer model loaded from fallback path")
-                    logger.info(f"Device: {'GPU' if device == 0 else 'CPU'}")
+                    logger.info(f"✓ Transformer model loaded from fallback path")
+                    logger.info(f"  Device: {'GPU' if device == 0 else 'CPU'}")
                 else:
                     logger.warning("No fallback path available or path doesn't exist")
             

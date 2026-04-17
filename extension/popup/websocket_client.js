@@ -39,6 +39,7 @@ class WebSocketManager {
     
     try {
       // Get WebSocket URL from config
+      const API_BASE_URL = typeof API !== 'undefined' ? API : 'https://fake-news-analyzer-j6ka.onrender.com';
       const wsUrl = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://');
       
       // Build connection URL with auth
@@ -396,7 +397,12 @@ class WebSocketManager {
 // Global WebSocket manager instance
 const wsManager = new WebSocketManager();
 
-// Auto-connect when token is available
+// DISABLED: Auto-connect causes reconnecting loop
+// Only connect when explicitly needed for real-time features
+// Users can enable WebSocket in settings if needed
+
+// Auto-connect when token is available (DISABLED)
+/*
 chrome.storage.local.get(['token', 'user'], (data) => {
   if (data.token) {
     // Small delay to ensure page is ready
@@ -416,3 +422,4 @@ chrome.storage.onChanged.addListener((changes, area) => {
     }
   }
 });
+*/

@@ -83,6 +83,9 @@ class MessageResponse(BaseModel):
     # Explainability and moderation
     explainability: Optional[dict] = None
     moderation_summary: Optional[dict] = None
+    # SHAP explainability
+    shap_highlights: Optional[List[dict]] = None
+    explanation_type: Optional[str] = None  # "shap" or "heuristic"
 
 
 # Phase 4.1: SHAP Explainability Schemas

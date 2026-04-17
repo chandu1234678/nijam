@@ -332,7 +332,7 @@ def get_highlights_with_shap(
                 return (highlights, "shap")
             else:
                 logger.debug("SHAP returned no highlights, using fallback")
-        else:
+        elif elapsed_ms >= timeout_ms:
             logger.warning(f"SHAP timeout ({elapsed_ms:.0f}ms > {timeout_ms}ms), using fallback")
     
     except ImportError:

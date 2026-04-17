@@ -1,5 +1,6 @@
 // ── Backend API URL ───────────────────────────────────────────
-const API = "https://fake-news-analyzer-j6ka.onrender.com";
+const API = "http://localhost:8000";  // Local testing
+// const API = "https://fake-news-analyzer-j6ka.onrender.com";  // Production
 
 const API_TIMEOUT_MS = 20000;
 const CLIENT_NAME = "edge-extension";

@@ -34,6 +34,8 @@ _DEFAULT_LIMIT = (60, 60)
 
 _store: dict = defaultdict(list)
 MAX_BODY_BYTES = 2 * 1024 * 1024  # 2 MB — allows compressed image base64
+_last_store_cleanup = 0.0
+_STORE_CLEANUP_INTERVAL = 300  # prune every 5 minutes
 
 # Security headers applied to every response
 _SECURITY_HEADERS = {
@@ -43,6 +45,14 @@ _SECURITY_HEADERS = {
     "Referrer-Policy":           "strict-origin-when-cross-origin",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "Permissions-Policy":        "geolocation=(), microphone=(), camera=()",
+    "Content-Security-Policy":   (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https:; "
+        "frame-ancestors 'none';"
+    ),
 }
 
 
@@ -82,6 +92,15 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         ip  = _client_ip(request)
         key = f"{ip}:{path}"
         now = time.time()
+
+        # Periodic cleanup to prevent unbounded memory growth
+        global _last_store_cleanup
+        if now - _last_store_cleanup > _STORE_CLEANUP_INTERVAL:
+            stale = [k for k, ts in _store.items() if not ts or ts[-1] < now - 3600]
+            for k in stale:
+                del _store[k]
+            _last_store_cleanup = now
+
         _store[key] = [t for t in _store[key] if t > now - window]
 
         if len(_store[key]) >= max_req:

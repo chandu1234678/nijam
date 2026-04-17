@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voice Flow Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+        }
+        .recording {
+            background: #ffebee !important;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎤 Voice Recording Test</h1>
+    
+    <button id="recordBtn">Start Recording</button>
+    <button id="stopBtn" disabled>Stop Recording</button>
+    
+    <div id="status">Ready to record</div>
+    
+    <div id="result"></div>
+
+    <script>
+        let mediaRecorder, audioChunks = [];
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+
+        recordBtn.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    await processAudio();
+                };
+                
+                mediaRecorder.start(100);
+                
+                recordBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.className = 'recording';
+                status.textContent = '🎤 Recording... Speak now!';
+                
+            } catch (error) {
+                status.textContent = '❌ Error: ' + error.message;
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+                status.className = '';
+                status.textContent = 'Processing...';
+            }
+        });
+
+        async function processAudio() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const formData = new FormData();
+            formData.append('audio', audioBlob);
+            formData.append('language', 'en');
+            formData.append('auto_detect_claim', 'true');
+
+            try {
+                const response = await fetch('http://localhost:8000/audio/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    status.textContent = '✅ Transcription complete!';
+                    result.innerHTML = `
+                        <h3>Result:</h3>
+                        <p><strong>Text:</strong> ${data.text}</p>
+                        <p><strong>Claim Detected:</strong> ${data.claim_detected ? '✅ Yes' : '❌ No'}</p>
+                        <p><strong>Language:</strong> ${data.language}</p>
+                        <p><strong>Service:</strong> ${data.service}</p>
+                    `;
+                } else {
+                    throw new Error(data.detail || 'Transcription failed');
+                }
+            } catch (error) {
+                status.textContent = '❌ Error: ' + error.message;
+                result.innerHTML = '<p style="color: red;">Failed to transcribe audio</p>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=420">
+  <title>Viral Spread Monitor - FactCheck AI</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .viral-header {
+      background: linear-gradient(135deg, #f5576c 0%, #ff8a80 100%);
+      padding: 20px;
+      color: white;
+      text-align: center;
+    }
+    .viral-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .viral-subtitle {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+    .viral-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding: 16px;
+      background: var(--bg);
+    }
+    .viral-stat-card {
+      background: var(--surface);
+      border: 1px solid var(--a-bdr);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .viral-stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .viral-stat-value.viral { color: #f5576c; }
+    .viral-stat-value.trending { color: #ff9800; }
+    .viral-stat-value.normal { color: var(--accent); }
+    .viral-stat-label {
+      font-size: 11px;
+      color: var(--t3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .viral-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--a-bdr);
+    }
+    .viral-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .viral-claim-card {
+      background: var(--surface);
+      border: 1px solid var(--a-bdr);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .viral-claim-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .viral-claim-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .viral-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .viral-badge.viral {
+      background: rgba(245, 87, 108, 0.15);
+      color: #f5576c;
+    }
+    .viral-badge.trending {
+      background: rgba(255, 152, 0, 0.15);
+      color: #ff9800;
+    }
+    .viral-claim-text {
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+      color: var(--t1);
+    }
+    .viral-claim-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--t3);
+    }
+    .viral-claim-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .viral-velocity-bar {
+      height: 4px;
+      background: var(--a-bdr);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .viral-velocity-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff9800, #f5576c);
+      transition: width 0.3s;
+    }
+    .viral-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--t3);
+    }
+    .viral-empty-icon {
+      font-size: 48px;
+      opacity: 0.3;
+      margin-bottom: 12px;
+    }
+    .viral-refresh-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .viral-refresh-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+    }
+    .viral-refresh-btn.spinning {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .viral-chart {
+      height: 120px;
+      margin-top: 12px;
+      position: relative;
+    }
+    .viral-chart-bars {
+      display: flex;
+      align-items: flex-end;
+      height: 100%;
+      gap: 4px;
+    }
+    .viral-chart-bar {
+      flex: 1;
+      background: linear-gradient(180deg, var(--accent), rgba(var(--accent-rgb), 0.3));
+      border-radius: 4px 4px 0 0;
+      min-height: 2px;
+      position: relative;
+      transition: all 0.3s;
+    }
+    .viral-chart-bar.has-viral {
+      background: linear-gradient(180deg, #f5576c, rgba(245, 87, 108, 0.3));
+    }
+    .viral-chart-bar:hover {
+      opacity: 0.8;
+    }
+    .viral-chart-label {
+      position: absolute;
+      bottom: -20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: var(--t3);
+      white-space: nowrap;
+    }
+    .back-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="viral-header">
+    <button class="back-btn" id="back-btn">
+      <span class="material-symbols-outlined ms-18">arrow_back</span>
+    </button>
+    <div class="viral-title">🚨 Viral Spread Monitor</div>
+    <div class="viral-subtitle">Real-time misinformation tracking</div>
+  </div>
+
+  <div class="viral-stats-grid">
+    <div class="viral-stat-card">
+      <div class="viral-stat-value viral" id="stat-viral">0</div>
+      <div class="viral-stat-label">Viral Claims</div>
+    </div>
+    <div class="viral-stat-card">
+      <div class="viral-stat-value trending" id="stat-trending">0</div>
+      <div class="viral-stat-label">Trending</div>
+    </div>
+    <div class="viral-stat-card">
+      <div class="viral-stat-value normal" id="stat-total">0</div>
+      <div class="viral-stat-label">Total Tracked</div>
+    </div>
+    <div class="viral-stat-card">
+      <div class="viral-stat-value normal" id="stat-checks">0</div>
+      <div class="viral-stat-label">Total Checks</div>
+    </div>
+  </div>
+
+  <div class="viral-section">
+    <div class="viral-section-title">
+      <span class="material-symbols-outlined ms-16">trending_up</span>
+      Spread Pattern (Last 24h)
+    </div>
+    <div class="viral-chart">
+      <div class="viral-chart-bars" id="chart-bars"></div>
+    </div>
+  </div>
+
+  <div class="viral-section">
+    <div class="viral-section-title">
+      <span class="material-symbols-outlined ms-16">warning</span>
+      Viral Alerts
+    </div>
+    <div id="viral-claims-list"></div>
+  </div>
+
+  <div class="viral-section">
+    <div class="viral-section-title">
+      <span class="material-symbols-outlined ms-16">whatshot</span>
+      Trending Claims
+    </div>
+    <div id="trending-claims-list"></div>
+  </div>
+
+  <button class="viral-refresh-btn" id="refresh-btn">
+    <span class="material-symbols-outlined ms-20">refresh</span>
+  </button>
+
+  <script src="config.js"></script>
+  <script src="viral.js"></script>
+</body>
+</html>

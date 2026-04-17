@@ -7,12 +7,14 @@ _env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 load_dotenv(_env_path)
 
 CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions"
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+GROQ_URL     = "https://api.groq.com/openai/v1/chat/completions"
+GEMINI_URL   = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+MINIMAX_URL  = "https://api.minimax.io/v1/chat/completions"
 
 CHAT_SYSTEM = (
     "You are a helpful, knowledgeable assistant specializing in media literacy and fact-checking. "
-    "Answer questions clearly and concisely. Be friendly and factual. Never fabricate sources or statistics."
+    "Answer questions clearly and concisely. Be friendly and factual. Never fabricate sources or statistics. "
+    "When discussing news or claims, always encourage users to verify information from multiple trusted sources."
 )
 
 CLAIM_DETECT_PROMPT = (
@@ -29,8 +31,9 @@ CLAIM_DETECT_PROMPT = (
 def _get_keys():
     return {
         "cerebras": os.getenv("CEREBRAS_API_KEY"),
-        "groq": os.getenv("GROQ_API_KEY"),
-        "gemini": os.getenv("GEMINI_API_KEY"),
+        "groq":     os.getenv("GROQ_API_KEY"),
+        "gemini":   os.getenv("GEMINI_API_KEY"),
+        "minimax":  os.getenv("MINIMAX_API_KEY"),
     }
 
 
@@ -39,7 +42,7 @@ def _call_openai_compat(url: str, key: str, model: str, messages: list, max_toke
         url,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
         json={"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
-        timeout=12
+        timeout=15
     )
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"].strip()
@@ -69,6 +72,27 @@ def _call_gemini(messages: list, max_tokens=400, temperature=0.7) -> str:
     return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
+def _call_minimax_chat(messages: list, max_tokens=400, temperature=0.7) -> str:
+    """MiniMax M2.7 for chat — fast, high quality, OpenAI-compatible."""
+    key = _get_keys()["minimax"]
+    if not key:
+        raise ValueError("MiniMax API key missing")
+    # Try M2.7-highspeed first for chat (lower latency), fall back to M2.7
+    for model in ["MiniMax-M2.7-highspeed", "MiniMax-M2.7"]:
+        try:
+            r = requests.post(
+                MINIMAX_URL,
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                json={"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
+                timeout=15
+            )
+            r.raise_for_status()
+            return r.json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            continue
+    raise ValueError("MiniMax chat failed")
+
+
 def _first_success(fn_list):
     """Run list of (name, callable) in parallel, return first success."""
     errors = []
@@ -95,13 +119,14 @@ def is_claim(text: str) -> bool:
         fns.append(("Groq", lambda: _call_openai_compat(GROQ_URL, keys["groq"], "llama3-8b-8192", messages, max_tokens=5, temperature=0)))
     if keys["gemini"]:
         fns.append(("Gemini", lambda: _call_gemini(messages, max_tokens=5, temperature=0)))
+    if keys["minimax"]:
+        fns.append(("MiniMax", lambda: _call_minimax_chat(messages, max_tokens=5, temperature=0)))
 
     try:
         result = _first_success(fns)
         return result.strip().lower().startswith("claim")
     except Exception:
         # Default: treat as chat (not claim) if all AI providers fail
-        # This prevents every message being fact-checked when AI is down
         return False
 
 
@@ -113,6 +138,9 @@ def run_chat(message: str, history: list) -> str:
 
     keys = _get_keys()
     fns = []
+    # MiniMax M2.7-highspeed first for chat — fastest with high quality
+    if keys["minimax"]:
+        fns.append(("MiniMax", lambda: _call_minimax_chat(msgs)))
     if keys["cerebras"]:
         fns.append(("Cerebras", lambda: _call_openai_compat(CEREBRAS_URL, keys["cerebras"], "llama3.1-8b", msgs)))
     if keys["groq"]:

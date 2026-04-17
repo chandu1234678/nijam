@@ -83,15 +83,37 @@ def get_spread_indicators(claim_text: str, db=None) -> dict:
     fact_checks = search_fact_checks(claim_text)
 
     # Check if any existing fact-check rates it as false
-    false_ratings = {"false", "fake", "incorrect", "misleading", "pants on fire",
-                     "mostly false", "four pinocchios", "debunked", "fabricated"}
-    debunked = []
-    for fc in fact_checks:
-        rating = fc.get("rating", "").lower()
-        if any(f in rating for f in false_ratings):
-            debunked.append(fc.get("reviewer", "Unknown"))
+    # Use exact/strong matches only — avoid "mostly false" matching real claims
+    # that happen to have the word "false" in a nuanced rating
+    STRONG_FALSE = {"false", "fake", "incorrect", "pants on fire",
+                    "four pinocchios", "debunked", "fabricated", "scam",
+                    "hoax", "not true", "untrue", "wrong"}
+    WEAK_FALSE   = {"misleading", "mostly false", "half true", "mixture",
+                    "needs context", "unverified"}
 
-    previously_debunked = len(debunked) > 0
+    debunked = []
+    weak_debunked = []
+    for fc in fact_checks:
+        rating = fc.get("rating", "").lower().strip()
+        reviewer = fc.get("reviewer", "Unknown")
+        # Only count if the fact-checked claim text is reasonably similar
+        # to our claim — avoids false positives from loosely related results
+        fc_claim = fc.get("claim", "").lower()
+        claim_lower = claim_text.lower()
+        # Simple overlap check: at least 3 significant words in common
+        claim_words = set(w for w in claim_lower.split() if len(w) > 4)
+        fc_words    = set(w for w in fc_claim.split() if len(w) > 4)
+        overlap = len(claim_words & fc_words)
+        if overlap < 2 and fc_claim:  # skip if claim text doesn't match well
+            continue
+        if any(f == rating or rating.startswith(f) for f in STRONG_FALSE):
+            debunked.append(reviewer)
+        elif any(f in rating for f in WEAK_FALSE):
+            weak_debunked.append(reviewer)
+
+    # Only mark as previously_debunked if at least one STRONG false rating
+    # OR two or more weak ratings from different reviewers
+    previously_debunked = len(debunked) > 0 or len(set(weak_debunked)) >= 2
 
     # Spread risk: higher if already debunked by multiple orgs
     spread_risk = min(1.0, len(fact_checks) * 0.15 + len(debunked) * 0.25)
@@ -113,7 +135,7 @@ def get_spread_indicators(claim_text: str, db=None) -> dict:
         "fact_checks":          fact_checks[:3],
         "fact_check_count":     len(fact_checks),
         "previously_debunked":  previously_debunked,
-        "debunk_sources":       debunked,
+        "debunk_sources":       debunked or weak_debunked,
         "db_verification_count": db_count,
         "spread_risk":          round(spread_risk, 2),
     }

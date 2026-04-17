@@ -43,6 +43,10 @@ chrome.storage.local.get(["token", "user", "currentSessionId"], async d => {
   user  = d.user;
   currentSessionId = d.currentSessionId || null;
   updateUserUI();
+  
+  // Initialize voice button after DOM is ready
+  initVoiceButton();
+  
   await loadSessions();
   if (currentSessionId) {
     await loadSessionMessages(currentSessionId);
@@ -666,6 +670,26 @@ function _renderFactCard(data, scroll = true, animate = true) {
 
   const srcCount = data.evidence_articles?.length || data.evidence?.length || 0;
 
+  // ── Viral/Trending badges (Phase 2) ───────────────────────────
+  const velocity = data.velocity_metrics || {};
+  const isViral = velocity.is_viral || false;
+  const isTrending = velocity.is_trending || false;
+  let viralBadgeHtml = "";
+  
+  if (isViral) {
+    viralBadgeHtml = `
+      <div class="viral-alert-badge">
+        <span class="material-symbols-outlined ms-12">warning</span>
+        🚨 VIRAL ALERT - ${velocity.count_5min || 0} checks in 5 min
+      </div>`;
+  } else if (isTrending) {
+    viralBadgeHtml = `
+      <div class="trending-badge">
+        <span class="material-symbols-outlined ms-12">trending_up</span>
+        ⚠️ TRENDING - ${velocity.count_1hr || 0} checks in 1 hour
+      </div>`;
+  }
+
   const vClass    = verdict === "real" ? "v-real" : verdict === "fake" ? "v-fake" : "v-uncertain";
   const vIcon     = verdict === "real" ? "check_circle" : verdict === "fake" ? "cancel" : "help";
   const vLabel    = verdict === "real" ? "REAL" : verdict === "fake" ? "FAKE" : "UNCERTAIN";
@@ -826,6 +850,7 @@ function _renderFactCard(data, scroll = true, animate = true) {
   const card = document.createElement("div");
   card.className = "fact-card";
   card.innerHTML = `
+    ${viralBadgeHtml}
     <div class="fact-verdict-hero">
       <div class="verdict-main">
         <span class="material-symbols-outlined verdict-icon-lg ${vClass}">${vIcon}</span>
@@ -991,7 +1016,7 @@ function _clearAttach() {
   attachedFileText = null;
   attachedFileName = null;
   document.getElementById("attach-preview-bar").style.display = "none";
-  ["file-image","file-pdf","file-txt"].forEach(id => {
+  ["file-image","file-audio","file-pdf","file-txt"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
@@ -1024,6 +1049,73 @@ document.getElementById("file-image").addEventListener("change", e => {
   };
   img.src = objectUrl;
 });
+
+// Audio — transcribe and fact-check audio files
+document.getElementById("file-audio").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  // Check file size (max 25MB)
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB > 25) {
+    alert(`Audio file too large: ${sizeMB.toFixed(1)}MB (max 25MB)`);
+    e.target.value = '';
+    return;
+  }
+  
+  attachedFileName = file.name;
+  _showPreview("audiotrack", `${file.name} (${sizeMB.toFixed(1)}MB)`);
+  
+  // Show processing message
+  inputText.value = `Transcribing audio from ${file.name}...`;
+  inputText.placeholder = 'Processing audio...';
+  autoResize();
+  
+  try {
+    // Send audio to backend for transcription
+    const formData = new FormData();
+    formData.append('audio', file);
+    formData.append('language', 'en');
+    formData.append('auto_detect_claim', 'true');
+    
+    const response = await authFetch('/audio/transcribe', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error?.detail || `Server error: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.success && result.text) {
+      // Put transcribed text in input
+      inputText.value = result.text;
+      inputText.placeholder = 'Ask anything or paste a claim…';
+      autoResize();
+      inputText.focus();
+      
+      // Show success message
+      _showPreview("audiotrack", `${file.name} ✓ Transcribed`);
+      
+      // Auto-send if it's a claim
+      if (result.claim_detected) {
+        setTimeout(() => send(), 1000);
+      }
+    } else {
+      throw new Error('No transcription received');
+    }
+  } catch (error) {
+    console.error('Audio transcription error:', error);
+    inputText.value = '';
+    inputText.placeholder = 'Ask anything or paste a claim…';
+    alert(`Failed to transcribe audio:\n${error.message}\n\nMake sure backend is running.`);
+    _clearAttach();
+  }
+});
+
 
 // PDF — extract text using PDF.js (loaded from CDN) or send filename as hint
 document.getElementById("file-pdf").addEventListener("change", async e => {
@@ -1244,4 +1336,286 @@ if (typeof wsManager !== 'undefined') {
     console.log('[Popup] Review queue updated:', message);
     // Reload review queue if on review page
   });
+}
+
+// ── Voice Recording ───────────────────────────────────────────
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+
+// Initialize voice button after DOM is loaded
+function initVoiceButton() {
+  const voiceBtn = document.getElementById("voice-btn");
+  if (!voiceBtn) {
+    console.warn("Voice button not found - will retry");
+    return;
+  }
+  voiceBtn.addEventListener("click", toggleVoiceRecording);
+  console.log("Voice button initialized");
+}
+
+async function toggleVoiceRecording() {
+  if (isRecording) {
+    stopVoiceRecording();
+    return;
+  }
+  
+  await startVoiceRecording();
+}
+
+async function checkMicrophonePermission() {
+  // This function is no longer needed - we'll request permission directly
+  return true;
+}
+
+async function startVoiceRecording() {
+  const voiceBtn = document.getElementById("voice-btn");
+  if (!voiceBtn) return;
+  
+  try {
+    // Use browser's built-in speech recognition (FREE!)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      // Use Web Speech API (free, no backend needed)
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      
+      let finalTranscript = '';
+      
+      recognition.onstart = () => {
+        isRecording = true;
+        voiceBtn.querySelector('.material-symbols-outlined').textContent = 'graphic_eq';
+        voiceBtn.style.color = '#f5576c';
+        voiceBtn.style.animation = 'pulse 1.5s ease-in-out infinite';
+        voiceBtn.title = 'Stop recording';
+        inputText.placeholder = '🎤 Listening...';
+        inputText.style.borderColor = '#f5576c';
+        inputText.style.boxShadow = '0 0 0 3px rgba(245, 87, 108, 0.1)';
+      };
+      
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        // Show live transcription
+        inputText.value = (finalTranscript + interimTranscript).trim();
+        autoResize();
+      };
+      
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        resetVoiceUI();
+        
+        let msg = 'Speech recognition error.\n\n';
+        if (event.error === 'not-allowed') {
+          msg += 'Microphone access denied.\n\nPlease:\n1. Click 🔒 in address bar\n2. Allow microphone\n3. Try again';
+        } else if (event.error === 'no-speech') {
+          msg = 'No speech detected. Please try again.';
+        } else {
+          msg += event.error;
+        }
+        
+        alert(msg);
+      };
+      
+      recognition.onend = () => {
+        isRecording = false;
+        resetVoiceUI();
+        
+        const text = finalTranscript.trim();
+        if (text) {
+          inputText.value = text;
+          autoResize();
+          
+          // Smart claim detection
+          if (detectClaimIntent(text)) {
+            setTimeout(() => send(), 500);
+          } else {
+            inputText.focus();
+          }
+        }
+      };
+      
+      mediaRecorder = recognition; // Store for stopping
+      recognition.start();
+      
+    } else {
+      // Fallback: Record audio and use backend
+      await startAudioRecording();
+    }
+    
+  } catch (error) {
+    console.error('Recording failed:', error);
+    resetVoiceUI();
+    alert('Failed to start recording: ' + error.message);
+  }
+}
+
+async function startAudioRecording() {
+  // Fallback method using MediaRecorder
+  const voiceBtn = document.getElementById("voice-btn");
+  
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+  mediaRecorder = new MediaRecorder(stream, { mimeType });
+  audioChunks = [];
+  
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data.size > 0) audioChunks.push(event.data);
+  };
+  
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach(track => track.stop());
+    await processVoiceRecording();
+  };
+  
+  mediaRecorder.start(100);
+  isRecording = true;
+  
+  voiceBtn.querySelector('.material-symbols-outlined').textContent = 'graphic_eq';
+  voiceBtn.style.color = '#f5576c';
+  voiceBtn.style.animation = 'pulse 1.5s ease-in-out infinite';
+  voiceBtn.title = 'Stop recording';
+  inputText.placeholder = '🎤 Listening...';
+  inputText.style.borderColor = '#f5576c';
+  inputText.style.boxShadow = '0 0 0 3px rgba(245, 87, 108, 0.1)';
+}
+
+function detectClaimIntent(text) {
+  // Client-side claim detection
+  const textLower = text.toLowerCase().trim();
+  
+  // Questions are usually chat
+  const questionStarters = ['what is', 'what are', 'who is', 'when did', 'where is', 'why did', 'how does', 'can you', 'tell me', 'explain'];
+  if (questionStarters.some(q => textLower.startsWith(q))) return false;
+  
+  // Greetings are chat
+  const greetings = ['hello', 'hi ', 'hey ', 'thanks'];
+  if (greetings.some(g => textLower.startsWith(g))) return false;
+  
+  // Claim indicators
+  const hasFactualVerb = /\b(is|are|was|were|will be|has been|contains?)\b/.test(textLower);
+  const hasNumbers = /\d+\s*(percent|%|million|billion|thousand|people)/.test(textLower);
+  const hasAbsolutes = /\b(always|never|all|none|every|everyone)\b/.test(textLower);
+  const hasCausation = /\b(causes?|leads? to|results? in|due to|makes?)\b/.test(textLower);
+  const hasAuthority = /\b(study|research|scientists?|doctors?|experts?|government)\b/.test(textLower);
+  const hasControversial = /\b(vaccine|covid|election|climate|conspiracy|hoax|fake)\b/.test(textLower);
+  
+  const score = (hasFactualVerb ? 2 : 0) + (hasNumbers ? 1 : 0) + (hasAbsolutes ? 1 : 0) + 
+                (hasCausation ? 1 : 0) + (hasAuthority ? 1 : 0) + (hasControversial ? 2 : 0);
+  
+  return score >= 2;
+}
+
+function resetVoiceUI() {
+  const voiceBtn = document.getElementById("voice-btn");
+  if (voiceBtn) {
+    voiceBtn.querySelector('.material-symbols-outlined').textContent = 'mic';
+    voiceBtn.style.color = '';
+    voiceBtn.style.animation = '';
+    voiceBtn.title = 'Voice input';
+  }
+  inputText.placeholder = 'Ask anything or paste a claim…';
+  inputText.style.borderColor = '';
+  inputText.style.boxShadow = '';
+  isRecording = false;
+}
+
+function stopVoiceRecording() {
+  if (!mediaRecorder) return;
+  
+  isRecording = false;
+  
+  // Check if it's Web Speech API or MediaRecorder
+  if (mediaRecorder.stop) {
+    mediaRecorder.stop();
+  }
+  
+  resetVoiceUI();
+}
+
+async function processVoiceRecording() {
+  try {
+    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+    
+    // Validate size
+    const sizeMB = audioBlob.size / (1024 * 1024);
+    if (sizeMB > 25) {
+      throw new Error('Recording too large (max 25MB)');
+    }
+    
+    if (audioBlob.size < 1024) {
+      throw new Error('Recording too short. Please speak for at least 1 second.');
+    }
+    
+    // Show processing message
+    inputText.placeholder = 'Transcribing audio...';
+    
+    // Transcribe audio with smart claim detection
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+    formData.append('language', 'en');
+    formData.append('auto_detect_claim', 'true');
+    
+    const response = await authFetch('/audio/transcribe', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      let errorMsg = 'Transcription failed';
+      try {
+        const error = await response.json();
+        errorMsg = error?.detail || errorMsg;
+      } catch (e) {
+        errorMsg = `Server error: ${response.status}`;
+      }
+      throw new Error(errorMsg);
+    }
+    
+    const result = await response.json();
+    
+    if (!result.success || !result.text) {
+      throw new Error('No transcription received. Please try again.');
+    }
+    
+    // Put transcribed text in input
+    inputText.value = result.text;
+    inputText.placeholder = 'Ask anything or paste a claim…';
+    autoResize();
+    
+    // Auto-send if backend detected it as a claim
+    if (result.claim_detected) {
+      // Backend detected this as a factual claim - auto-verify
+      setTimeout(() => send(), 500);
+    } else {
+      // Looks like a question/chat - let user review
+      inputText.focus();
+    }
+    
+  } catch (error) {
+    console.error('Processing error:', error);
+    resetVoiceUI();
+    
+    let msg = 'Failed to transcribe audio.\n\n';
+    if (error.message) {
+      msg += error.message;
+    } else {
+      msg += 'Please check:\n- Backend is running\n- OpenAI API key is set\n- Internet connection';
+    }
+    
+    alert(msg);
+  }
 }

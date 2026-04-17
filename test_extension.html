@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Extension Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            background: #f5f5f5;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .result {
+            background: white;
+            padding: 15px;
+            margin-top: 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 FactChecker Extension Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Text Selection</h2>
+        <p>Select this text and right-click to analyze: <strong>"The earth is flat and NASA is hiding the truth"</strong></p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Extension Popup</h2>
+        <p>Click the extension icon in your browser toolbar to open the popup</p>
+        <ul>
+            <li>✓ Check if login page loads</li>
+            <li>✓ Test signup/login functionality</li>
+            <li>✓ Test message sending</li>
+            <li>✓ Check voice recorder page</li>
+        </ul>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: Voice Recorder</h2>
+        <p>Steps to test:</p>
+        <ol>
+            <li>Open extension popup</li>
+            <li>Click sidebar menu</li>
+            <li>Click "Voice Check" (🎤 icon)</li>
+            <li>Click microphone button</li>
+            <li>Allow microphone access</li>
+            <li>Speak a claim (e.g., "The earth is flat")</li>
+            <li>Click stop</li>
+            <li>Review transcription</li>
+            <li>Click "Verify Claim"</li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 4: Backend API</h2>
+        <button onclick="testHealth()">Test Health Endpoint</button>
+        <button onclick="testMessage()">Test Message Endpoint</button>
+        <div id="api-result" class="result" style="display:none"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Backend Status</h2>
+        <p>Backend URL: <code>http://localhost:8000</code></p>
+        <p>API Docs: <a href="http://localhost:8000/docs" target="_blank">http://localhost:8000/docs</a></p>
+        <p>Health Check: <a href="http://localhost:8000/health" target="_blank">http://localhost:8000/health</a></p>
+    </div>
+    
+    <script>
+        async function testHealth() {
+            const result = document.getElementById('api-result');
+            result.style.display = 'block';
+            result.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/health');
+                const data = await response.json();
+                result.innerHTML = `
+                    <h3>✓ Health Check Passed</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                result.innerHTML = `
+                    <h3>✗ Health Check Failed</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+        
+        async function testMessage() {
+            const result = document.getElementById('api-result');
+            result.style.display = 'block';
+            result.innerHTML = 'Testing message endpoint (requires auth)...';
+            
+            try {
+                const response = await fetch('http://localhost:8000/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Is the earth flat?',
+                        history: [],
+                        session_id: null
+                    })
+                });
+                
+                if (response.status === 401) {
+                    result.innerHTML = `
+                        <h3>✓ Message Endpoint Works</h3>
+                        <p>Status: 401 Unauthorized (expected - requires authentication)</p>
+                        <p>This means the endpoint is working correctly!</p>
+                    `;
+                } else {
+                    const data = await response.json();
+                    result.innerHTML = `
+                        <h3>✓ Message Endpoint Response</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                result.innerHTML = `
+                    <h3>✗ Message Endpoint Failed</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
