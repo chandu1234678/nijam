@@ -1,5 +1,13 @@
 // Viral Spread Monitor
-// API, apiFetch, buildHeaders, readJsonSafe are defined in config.js (loaded first)
+// config.js is loaded before this file and provides: API, apiFetch, buildHeaders, readJsonSafe
+
+// Safety fallback in case config.js didn't load
+if (typeof apiFetch === "undefined") {
+  const _API = (typeof API !== "undefined") ? API : "http://127.0.0.1:8000";
+  window.apiFetch = async (path, opts = {}) => fetch(_API + path, opts);
+  window.buildHeaders = (extra = {}) => extra;
+  window.readJsonSafe = async (res) => { try { return await res.json(); } catch { return null; } };
+}
 
 let refreshTimer = null;
 
