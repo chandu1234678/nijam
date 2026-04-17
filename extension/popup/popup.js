@@ -215,7 +215,7 @@ function showWelcome() {
   wrap.className = "welcome-screen";
   wrap.innerHTML = `
     <img src="../icons/logo.png" alt="" class="welcome-logo-img" style="width:56px;height:56px;object-fit:contain;margin-bottom:4px;">
-    <div class="welcome-brand"><span class="brand-main">FactChecker</span><span class="brand-ai"> AI</span></div>
+    <div class="welcome-brand"><span class="brand-main">PiNE</span><span class="brand-ai"> AI</span></div>
     <div class="welcome-sub">Ask me anything or paste a news claim.<br>I'll chat or fact-check automatically.</div>
     <div class="welcome-chips">
       <button class="welcome-chip" id="wc1">📰 Paste a headline to fact-check</button>
@@ -991,9 +991,9 @@ async function submitFeedback(card, data, actual) {
 }
 
 // ── Attach menu ───────────────────────────────────────────────
-let attachedImageUrl = null;
-let attachedFileText = null;
-let attachedFileName = null;
+let attachedImageUrl  = null;  // base64 data URI for images
+let attachedFileData  = null;  // { file, type } or { text, type }
+let attachedFileName  = null;
 
 const attachBtn  = document.getElementById("attach-btn");
 const attachMenu = document.getElementById("attach-menu");
@@ -1012,9 +1012,9 @@ function _showPreview(icon, name) {
 }
 
 function _clearAttach() {
-  attachedImageUrl = null;
-  attachedFileText = null;
-  attachedFileName = null;
+  attachedImageUrl  = null;
+  attachedFileData  = null;
+  attachedFileName  = null;
   document.getElementById("attach-preview-bar").style.display = "none";
   ["file-image","file-audio","file-pdf","file-txt"].forEach(id => {
     const el = document.getElementById(id);
@@ -1050,146 +1050,68 @@ document.getElementById("file-image").addEventListener("change", e => {
   img.src = objectUrl;
 });
 
-// Audio — transcribe and fact-check audio files
-document.getElementById("file-audio").addEventListener("change", async e => {
+// Audio — store file, send to /upload on submit (server-side Whisper transcription)
+document.getElementById("file-audio").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
-  
-  // Check file size (max 25MB)
   const sizeMB = file.size / (1024 * 1024);
   if (sizeMB > 25) {
     alert(`Audio file too large: ${sizeMB.toFixed(1)}MB (max 25MB)`);
-    e.target.value = '';
+    e.target.value = "";
     return;
   }
-  
+  attachedFileData = { file, type: "audio" };
   attachedFileName = file.name;
   _showPreview("audiotrack", `${file.name} (${sizeMB.toFixed(1)}MB)`);
-  
-  // Show processing message
-  inputText.value = `Transcribing audio from ${file.name}...`;
-  inputText.placeholder = 'Processing audio...';
-  autoResize();
-  
-  try {
-    // Send audio to backend for transcription
-    const formData = new FormData();
-    formData.append('audio', file);
-    formData.append('language', 'en');
-    formData.append('auto_detect_claim', 'true');
-    
-    const response = await authFetch('/audio/transcribe', {
-      method: 'POST',
-      body: formData
-    });
-    
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error?.detail || `Server error: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    if (result.success && result.text) {
-      // Put transcribed text in input
-      inputText.value = result.text;
-      inputText.placeholder = 'Ask anything or paste a claim…';
-      autoResize();
-      inputText.focus();
-      
-      // Show success message
-      _showPreview("audiotrack", `${file.name} ✓ Transcribed`);
-      
-      // Auto-send if it's a claim
-      if (result.claim_detected) {
-        setTimeout(() => send(), 1000);
-      }
-    } else {
-      throw new Error('No transcription received');
-    }
-  } catch (error) {
-    console.error('Audio transcription error:', error);
-    inputText.value = '';
-    inputText.placeholder = 'Ask anything or paste a claim…';
-    alert(`Failed to transcribe audio:\n${error.message}\n\nMake sure backend is running.`);
-    _clearAttach();
-  }
 });
 
 
-// PDF — extract text using PDF.js (loaded from CDN) or send filename as hint
-document.getElementById("file-pdf").addEventListener("change", async e => {
+// PDF — store file, send to /upload on submit (server-side pdfplumber extraction)
+document.getElementById("file-pdf").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
-  attachedFileName = file.name;
-  _showPreview("picture_as_pdf", `${file.name} (reading...)`);
-
-  try {
-    // Try to extract text using FileReader + basic text extraction
-    const arrayBuffer = await file.arrayBuffer();
-    // Simple PDF text extraction — look for text between BT/ET markers
-    const bytes = new Uint8Array(arrayBuffer);
-    const text  = new TextDecoder('latin1').decode(bytes);
-    const matches = text.match(/\(([^)]{5,200})\)/g) || [];
-    const extracted = matches
-      .map(m => m.slice(1, -1).replace(/\\n/g, ' ').replace(/\\/g, '').trim())
-      .filter(s => /[a-zA-Z]{3,}/.test(s))
-      .join(' ')
-      .slice(0, 2000);
-
-    if (extracted.length > 50) {
-      attachedFileText = extracted;
-      inputText.value  = extracted.slice(0, 500);
-      autoResize();
-      _showPreview("picture_as_pdf", file.name);
-    } else {
-      // Fallback: just use filename as context
-      attachedFileText = `PDF document: ${file.name}`;
-      inputText.value  = `Fact-check this PDF: ${file.name}`;
-      autoResize();
-      _showPreview("picture_as_pdf", file.name);
-    }
-  } catch (err) {
-    attachedFileText = `PDF: ${file.name}`;
-    inputText.value  = `Fact-check this document: ${file.name}`;
-    autoResize();
-    _showPreview("picture_as_pdf", file.name);
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB > 20) {
+    alert(`PDF too large: ${sizeMB.toFixed(1)}MB (max 20MB)`);
+    e.target.value = "";
+    return;
   }
-  inputText.focus();
+  attachedFileData = { file, type: "pdf" };
+  attachedFileName = file.name;
+  _showPreview("picture_as_pdf", file.name);
 });
 
-// Text / DOC file
+// TXT / DOCX — plain text read client-side; DOCX sent to /upload server-side
 document.getElementById("file-txt").addEventListener("change", e => {
   const file = e.target.files[0];
   if (!file) return;
-
-  // DOCX/DOC are binary ZIP files — can't read as text
-  if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-    attachedFileText = `Document: ${file.name}`;
-    attachedFileName = file.name;
-    inputText.value  = `Summarize and fact-check this document: ${file.name}`;
-    autoResize();
-    _showPreview("description", `${file.name} (name only — open file to copy text)`);
-    inputText.focus();
+  const sizeMB = file.size / (1024 * 1024);
+  if (sizeMB > 20) {
+    alert(`File too large: ${sizeMB.toFixed(1)}MB (max 20MB)`);
+    e.target.value = "";
     return;
   }
-
+  // DOCX/DOC are binary — send to /upload for server-side extraction
+  if (/\.(docx?)$/i.test(file.name)) {
+    attachedFileData = { file, type: "docx" };
+    attachedFileName = file.name;
+    _showPreview("description", file.name);
+    return;
+  }
+  // Plain text — read client-side (safe, no binary garbage)
   const reader = new FileReader();
   reader.onload = ev => {
     const text = ev.target.result.slice(0, 3000);
-    attachedFileText = text;
+    // Store as attachment — do NOT dump into input box
+    attachedFileData = { text, type: "txt" };
     attachedFileName = file.name;
-    inputText.value  = text;
-    autoResize();
     _showPreview("description", file.name);
-    inputText.focus();
   };
   reader.readAsText(file);
 });
 async function send() {
   const text = inputText.value.trim();
-  // Allow send if there's an image attached even with no text
-  if (!text && !attachedImageUrl) return;
+  if (!text && !attachedImageUrl && !attachedFileData) return;
   inputText.value = "";
   autoResize();
 
@@ -1199,6 +1121,8 @@ async function send() {
 
   // Capture and clear attachments before async
   const imageUrl = attachedImageUrl;
+  const fileData = attachedFileData;
+  const fileName = attachedFileName;
   _clearAttach();
 
   // If image attached with no/short message, use a descriptive prompt
@@ -1206,17 +1130,46 @@ async function send() {
   if (imageUrl && text.length < 10) {
     sendText = text.length > 0 ? text : "What does this image show? Is there any misinformation or fake news in it?";
   }
-  // Ensure sendText is never empty (backend requires non-empty message)
-  if (!sendText) sendText = "Analyze this content";
-  addUserMsg(text, true, imageUrl);
+  if (!sendText && !fileData) sendText = "Analyze this content";
+
+  // Show user message (with file name badge if file attached)
+  addUserMsg(text || (fileName ? "\uD83D\uDCCE " + fileName : ""), true, imageUrl);
   const typing = addTyping();
   sendBtn.disabled = true;
 
   try {
-    const body = { message: sendText, session_id: currentSessionId, history };
-    if (imageUrl) body.image_url = imageUrl;
-    const res  = await authFetch("/message", { method: "POST", body: JSON.stringify(body) });
-    const data = await readJsonSafe(res);
+    let res, data;
+
+    // ── File upload path (PDF / DOCX / audio / txt) ───────────
+    if (fileData) {
+      const form = new FormData();
+      if (fileData.file) {
+        form.append("file", fileData.file, fileData.file.name);
+      } else if (fileData.text) {
+        // Plain text — wrap in Blob so /upload receives it as a file
+        const blob = new Blob([fileData.text], { type: "text/plain" });
+        form.append("file", blob, fileName || "document.txt");
+      }
+      if (sendText) form.append("claim", sendText);
+      form.append("language", "en");
+      // uploadFetch — no Content-Type header (browser sets multipart boundary)
+      res  = await uploadFetch("/upload", form);
+      data = await readJsonSafe(res);
+
+    // ── Image path — send to /message with image_url ──────────
+    } else if (imageUrl) {
+      const body = { message: sendText, session_id: currentSessionId, history };
+      body.image_url = imageUrl;
+      res  = await authFetch("/message", { method: "POST", body: JSON.stringify(body) });
+      data = await readJsonSafe(res);
+
+    // ── Normal text path ──────────────────────────────────────
+    } else {
+      const body = { message: sendText, session_id: currentSessionId, history };
+      res  = await authFetch("/message", { method: "POST", body: JSON.stringify(body) });
+      data = await readJsonSafe(res);
+    }
+
     if (!res.ok) {
       let detail = `Server error ${res.status}`;
       if (data) {
@@ -1266,6 +1219,17 @@ async function authFetch(path, opts = {}) {
       ...(opts.headers || {}),
     })
   });
+  if (res.status === 401) {
+    chrome.storage.local.clear(() => { window.location.href = chrome.runtime.getURL("popup/login.html"); });
+  }
+  return res;
+}
+
+// uploadFetch — multipart/form-data (NO Content-Type; browser sets boundary automatically)
+async function uploadFetch(path, formData) {
+  const headers = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await apiFetch(path, { method: "POST", headers, body: formData });
   if (res.status === 401) {
     chrome.storage.local.clear(() => { window.location.href = chrome.runtime.getURL("popup/login.html"); });
   }

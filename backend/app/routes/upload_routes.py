@@ -46,10 +46,11 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 AUDIO_EXTS = {".mp3", ".wav", ".webm", ".ogg", ".m4a", ".aac"}
 PDF_EXTS   = {".pdf"}
 DOCX_EXTS  = {".docx"}
+TXT_EXTS   = {".txt", ".text", ".md"}
 
 
 def _detect_type(filename: str, content_type: str) -> str:
-    """Return 'image', 'audio', 'pdf', 'docx', or 'unknown'."""
+    """Return 'image', 'audio', 'pdf', 'docx', 'txt', or 'unknown'."""
     ext = os.path.splitext(filename.lower())[1] if filename else ""
     ct  = (content_type or "").lower()
 
@@ -57,6 +58,7 @@ def _detect_type(filename: str, content_type: str) -> str:
     if ct in AUDIO_TYPES or ext in AUDIO_EXTS:  return "audio"
     if ct == PDF_TYPE    or ext in PDF_EXTS:     return "pdf"
     if ct == DOCX_TYPE   or ext in DOCX_EXTS:   return "docx"
+    if ct == "text/plain" or ext in TXT_EXTS:   return "txt"
     return "unknown"
 
 
@@ -257,11 +259,39 @@ async def upload_file(
         }
         return verification
 
+    # ── TXT ───────────────────────────────────────────────────
+    elif file_type == "txt":
+        if size_mb > MAX_DOC_MB:
+            raise HTTPException(400, f"Text file too large ({size_mb:.1f}MB, max {MAX_DOC_MB}MB)")
+
+        try:
+            text = data.decode("utf-8", errors="replace").strip()
+        except Exception:
+            text = data.decode("latin-1", errors="replace").strip()
+
+        if not text or len(text) < 5:
+            raise HTTPException(400, "Text file is empty.")
+
+        claim_text = (claim + " " + text[:1800]).strip() if claim else text[:2000]
+
+        from app.api import message as verify_message
+        from app.schemas import MessageRequest
+        req = MessageRequest(message=claim_text)
+        verification = verify_message(req, db, user)
+        verification["upload"] = {
+            "file_type":    "txt",
+            "filename":     file.filename,
+            "size_mb":      round(size_mb, 2),
+            "extracted_chars": len(text),
+            "text_preview": text[:200],
+        }
+        return verification
+
     else:
         raise HTTPException(
             400,
             f"Unsupported file type: {file.content_type or file.filename}. "
-            "Supported: jpg/png/gif/webp (image), mp3/wav/webm/ogg/m4a (audio), pdf, docx"
+            "Supported: jpg/png/gif/webp (image), mp3/wav/webm/ogg/m4a (audio), pdf, docx, txt"
         )
 
 
@@ -278,6 +308,7 @@ def upload_info():
             "audio": {"formats": ["mp3", "wav", "webm", "ogg", "m4a", "aac"], "max_mb": MAX_AUDIO_MB},
             "pdf":   {"formats": ["pdf"],  "max_mb": MAX_DOC_MB},
             "docx":  {"formats": ["docx"], "max_mb": MAX_DOC_MB},
+            "txt":   {"formats": ["txt", "text", "md"], "max_mb": MAX_DOC_MB},
         },
         "usage": "POST /upload with multipart/form-data: file=<file>, claim=<optional claim text>",
     }
