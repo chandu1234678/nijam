@@ -1,4 +1,4 @@
-# FactChecker AI — Comprehensive Roadmap
+# PiNE AI — Comprehensive Roadmap
 
 ## ✅ BACKEND RUNNING & TESTED
 
@@ -716,7 +716,7 @@ uvicorn app.main:app --reload --port 8000
 # Upload notebooks/ to Kaggle, enable GPU, run cells
 
 # Extension (reload after changes)
-# chrome://extensions → FactChecker AI → Reload
+# chrome://extensions → PiNE AI → Reload
 ```
 
 ---

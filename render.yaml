@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: factcheck-ai-backend
+    name: pine-ai-backend
     runtime: python
     rootDir: backend
     pythonVersion: "3.11.9"

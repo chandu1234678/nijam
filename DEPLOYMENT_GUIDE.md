@@ -1,6 +1,6 @@
-# FactCheck AI - Deployment Guide
+# PiNE AI - Deployment Guide
 
-Complete guide for deploying FactCheck AI to production.
+Complete guide for deploying PiNE AI to production.
 
 ---
 

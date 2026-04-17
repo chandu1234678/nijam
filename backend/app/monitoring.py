@@ -139,7 +139,7 @@ errors_total = Counter(
 app_info = Info('app', 'Application information')
 app_info.info({
     'version': '2.0.0',
-    'name': 'FactCheck AI',
+    'name': 'PiNE AI',
     'environment': 'production'
 })
 

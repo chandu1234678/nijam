@@ -1,4 +1,4 @@
-# FactChecker AI - Progress Summary
+# PiNE AI - Progress Summary
 
 **Last Updated:** 2026-04-17
 

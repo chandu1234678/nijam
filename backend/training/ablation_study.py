@@ -1,5 +1,5 @@
 """
-Ablation Study — FactChecker AI Pipeline
+Ablation Study — PiNE AI Pipeline
 
 Measures F1 score contribution of each component:
   1. ML only

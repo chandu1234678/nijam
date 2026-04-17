@@ -93,10 +93,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="FactCheck AI",
+    title="PiNE AI",
     version="2.0.0",
     lifespan=lifespan,
-    description="AI-powered fact-checking API with ML models, evidence search, and real-time verification",
+    description="PiNE AI — AI-powered fact-checking API with ML models, evidence search, and real-time verification",
     # Docs enabled for development
     docs_url="/docs",
     redoc_url="/redoc",

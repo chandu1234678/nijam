@@ -194,7 +194,7 @@ async function newChat() {
   currentSessionId = null;
   history = [];
   chrome.storage.local.remove("currentSessionId");
-  document.getElementById("chat-title").textContent = "FactCheck AI";
+  document.getElementById("chat-title").textContent = "PiNE AI";
   chatContainer.innerHTML = "";
   showWelcome();
   closeSidebar();

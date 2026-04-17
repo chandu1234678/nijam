@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="extension/icons/logo.png" alt="FactChecker AI Logo" width="180"/>
+  <img src="extension/icons/logo.png" alt="PiNE AI Logo" width="180"/>
 </p>
 
-<h1 align="center">FactChecker AI</h1>
+<h1 align="center">PiNE AI</h1>
 
 <p align="center">
   A Chrome extension that verifies news claims in real time using a multi-signal pipeline:<br>
@@ -23,7 +23,7 @@
 
 ## 🎉 NEW: Phase 4 Production Features
 
-**FactChecker AI is now production-ready!** Recent additions include:
+**PiNE AI is now production-ready!** Recent additions include:
 
 - ✅ **SHAP Explainability** - Visual AI explanations showing which words triggered the verdict
 - ✅ **Review Queue** - Human-in-the-loop interface for uncertain claims (active learning)
@@ -37,9 +37,9 @@
 
 ## What Makes This Different from Google AI
 
-Google AI summarizes what the internet says. FactChecker AI verifies whether the internet is wrong.
+Google AI summarizes what the internet says. PiNE AI verifies whether the internet is wrong.
 
-| Feature | Google AI | FactChecker AI |
+| Feature | Google AI | PiNE AI |
 |---|---|---|
 | Claim-level verification | ✗ | ✓ |
 | Evidence consensus scoring | ✗ | ✓ |
@@ -346,7 +346,7 @@ Visit `http://127.0.0.1:8000/health` to confirm it's running.
 2. Enable "Developer mode" (toggle, top-right)
 3. Click "Load unpacked"
 4. Select the `extension/` folder from this repo
-5. The FactChecker AI icon will appear in your toolbar
+5. The PiNE AI icon will appear in your toolbar
 
 For local dev, open `extension/popup/config.js` and point the API URL to `http://127.0.0.1:8000`.
 

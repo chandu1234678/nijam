@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "FactCheck AI - Production Monitoring",
+    "title": "PiNE AI - Production Monitoring",
     "tags": ["factcheck", "ml", "production"],
     "timezone": "browser",
     "panels": [

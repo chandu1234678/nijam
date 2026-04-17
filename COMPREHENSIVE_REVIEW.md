@@ -1,4 +1,4 @@
-# FactChecker AI - Comprehensive Technical Review
+# PiNE AI - Comprehensive Technical Review
 
 <p align="center">
   <img src="https://img.shields.io/badge/Accuracy-96.63%25-brightgreen" />
@@ -33,7 +33,7 @@ Existing fact-checking approaches have critical limitations:
 
 ### What We're Solving
 
-**FactChecker AI addresses the core challenge: Real-time, accurate, explainable verification of claims at scale.**
+**PiNE AI addresses the core challenge: Real-time, accurate, explainable verification of claims at scale.**
 
 We solve:
 - ✅ Speed: <5 second verification vs days for manual fact-checking
@@ -1347,7 +1347,7 @@ evidence_score = Σ(support × trust) / Σ(total × trust)
 
 ### vs. Google AI / Gemini
 
-| Feature | Google AI | FactChecker AI |
+| Feature | Google AI | PiNE AI |
 |---------|-----------|----------------|
 | **Purpose** | Summarize web content | Verify truth |
 | **Claim Detection** | ❌ | ✅ |
@@ -1360,7 +1360,7 @@ evidence_score = Σ(support × trust) / Σ(total × trust)
 
 ### vs. Traditional Fact-Checkers (Snopes, PolitiFact)
 
-| Feature | Manual Fact-Checking | FactChecker AI |
+| Feature | Manual Fact-Checking | PiNE AI |
 |---------|---------------------|----------------|
 | **Speed** | Days/weeks | <5 seconds |
 | **Scale** | 10-100 claims/day | 10k+ claims/hour |
@@ -1371,7 +1371,7 @@ evidence_score = Σ(support × trust) / Σ(total × trust)
 
 ### vs. Social Media Fact-Checking (Facebook, Twitter)
 
-| Feature | Platform Fact-Checking | FactChecker AI |
+| Feature | Platform Fact-Checking | PiNE AI |
 |---------|----------------------|----------------|
 | **Timing** | Reactive (after viral) | Proactive (before viral) |
 | **Accuracy** | 70-80% | 96.63% |
@@ -1382,7 +1382,7 @@ evidence_score = Σ(support × trust) / Σ(total × trust)
 
 ### vs. Academic Systems
 
-| Feature | Research Prototypes | FactChecker AI |
+| Feature | Research Prototypes | PiNE AI |
 |---------|-------------------|----------------|
 | **Production Ready** | ❌ | ✅ |
 | **User Interface** | ❌ | ✅ Chrome extension |
@@ -2178,8 +2178,8 @@ SENTRY_DSN=your_sentry_dsn
 If you use this system in your research, please cite:
 
 ```bibtex
-@software{factchecker_ai_2026,
-  title = {FactChecker AI: Multi-Signal Fact-Checking with Learned Decision Fusion},
+@software{pine_ai_2026,
+  title = {PiNE AI: Multi-Signal Fact-Checking with Learned Decision Fusion},
   author = {Chandu},
   year = {2026},
   url = {https://github.com/chandu1234678/fake-news-analyzer},
@@ -2191,7 +2191,7 @@ If you use this system in your research, please cite:
 
 ## 🎉 Conclusion
 
-FactChecker AI represents a comprehensive solution to the misinformation crisis, combining:
+PiNE AI represents a comprehensive solution to the misinformation crisis, combining:
 
 ✅ **State-of-the-art accuracy** (96.63%) through multi-signal fusion
 ✅ **Real-time detection** (<5 seconds) for viral misinformation

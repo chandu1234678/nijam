@@ -11,7 +11,7 @@ load_dotenv(_env_path)
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 FROM_EMAIL    = os.getenv("SMTP_USER", "factcheckai2@gmail.com")
-FROM_NAME     = "FactChecker AI"
+FROM_NAME     = "PiNE AI"
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def send_otp_email(to_email: str, otp: str) -> bool:
         <tr>
           <td align="center" style="padding-bottom:48px;">
             <p style="margin:0;font-size:17px;color:#6e6e73;line-height:1.5;max-width:360px;">
-              Enter this code to reset your FactChecker AI password.
+              Enter this code to reset your PiNE AI password.
               It expires in 10 minutes.
             </p>
           </td>
@@ -103,7 +103,7 @@ def send_otp_email(to_email: str, otp: str) -> bool:
           <td align="center" style="padding-top:32px;padding-bottom:16px;">
             <p style="margin:0;font-size:13px;color:#6e6e73;line-height:1.6;max-width:380px;">
               Never share this code with anyone.
-              FactChecker AI will never ask for it by phone or message.
+              PiNE AI will never ask for it by phone or message.
             </p>
           </td>
         </tr>
@@ -121,7 +121,7 @@ def send_otp_email(to_email: str, otp: str) -> bool:
         <tr>
           <td align="center">
             <p style="margin:0;font-size:12px;color:#aeaeb2;letter-spacing:0.1px;">
-              FactChecker AI &nbsp;·&nbsp; © 2026
+              PiNE AI &nbsp;·&nbsp; © 2026
             </p>
           </td>
         </tr>

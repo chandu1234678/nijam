@@ -1,6 +1,6 @@
-# FactCheck AI - Quick Start Guide
+# PiNE AI - Quick Start Guide
 
-Get FactCheck AI running in 5 minutes!
+Get PiNE AI running in 5 minutes!
 
 ---
 
@@ -133,7 +133,7 @@ const API_BASE = "http://127.0.0.1:8000";  // For local development
 3. Enable "Developer mode" (toggle in top-right)
 4. Click "Load unpacked"
 5. Select the `extension/` folder
-6. FactCheck AI icon appears in toolbar!
+6. PiNE AI icon appears in toolbar!
 
 ---
 
@@ -141,7 +141,7 @@ const API_BASE = "http://127.0.0.1:8000";  // For local development
 
 ### Create Account
 
-1. Click FactCheck AI icon in toolbar
+1. Click PiNE AI icon in toolbar
 2. Click "Sign Up"
 3. Enter email and password
 4. Click "Create Account"
