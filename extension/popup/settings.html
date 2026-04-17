@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Settings — FactCheck AI</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<div class="page-wrap">
+
+  <header class="page-header">
+    <a id="back-btn" class="back-btn">
+      <span class="material-symbols-outlined ms-20">arrow_back</span>
+    </a>
+    <h1>Settings</h1>
+  </header>
+
+  <div class="page-body">
+
+    <div class="card">
+      <div class="card-title">Profile</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div id="profile-avatar" class="sidebar-avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0">?</div>
+        <div>
+          <div id="profile-name" style="font-size:13px;font-weight:500;color:var(--t1)">Loading...</div>
+          <div id="profile-email" style="font-size:11px;color:var(--t3)"></div>
+        </div>
+      </div>
+      <button id="logout-btn" class="danger-btn">
+        <span class="material-symbols-outlined ms-14" style="vertical-align:middle;margin-right:6px">logout</span>
+        Sign Out
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Preferences</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Auto fact-check selected text</div>
+          <div class="setting-sub">Analyze text when you right-click</div>
+        </div>
+        <div class="toggle-track on" id="toggle-autocheck"><div class="toggle-thumb"></div></div>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">Show confidence scores</div>
+          <div class="setting-sub">Display ML and AI scores on cards</div>
+        </div>
+        <div class="toggle-track on" id="toggle-scores"><div class="toggle-thumb"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">About</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="font-size:12px;color:var(--t3)">Version</span>
+          <span style="font-size:12px;color:var(--t1)" id="app-version">—</span>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <nav class="bottom-nav">
+    <a id="bn-chat"><span class="material-symbols-outlined">chat</span>Chat</a>
+    <a id="bn-dashboard"><span class="material-symbols-outlined">dashboard</span>Dashboard</a>
+    <a id="bn-review"><span class="material-symbols-outlined">fact_check</span>Review</a>
+    <a id="bn-history"><span class="material-symbols-outlined">history</span>History</a>
+    <a id="bn-settings" class="active"><span class="material-symbols-outlined">settings</span>Settings</a>
+  </nav>
+
+</div>
+<script src="config.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>
