@@ -1,35 +1,50 @@
-// Review Queue - Active Learning Interface
-// config.js is loaded before this file and provides: API, apiFetch, buildHeaders, readJsonSafe
+// Review Queue — PiNE AI
+// Self-contained: does not rely on any globals from config.js
 
-// Safety fallback in case config.js didn't load (should not happen in normal use)
-if (typeof apiFetch === "undefined") {
-  const _API = (typeof API !== "undefined") ? API : "http://127.0.0.1:8000";
-  window.apiFetch = async (path, opts = {}) => {
-    return fetch(_API + path, opts);
-  };
-  window.buildHeaders = (extra = {}) => extra;
-  window.readJsonSafe = async (res) => { try { return await res.json(); } catch { return null; } };
+const _REVIEW_API = (function () {
+  // Try to use the API constant from config.js if available, else fallback
+  if (typeof API !== "undefined") return API;
+  return "http://127.0.0.1:8000";
+})();
+
+async function _reviewFetch(path, opts = {}) {
+  const url = _REVIEW_API + path;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
+
+async function _reviewJson(res) {
+  try { return await res.json(); } catch { return null; }
+}
+
+function _reviewHeaders(extra = {}) {
+  return {
+    "X-Client": "pine-extension",
+    ...extra,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────
 
 let currentFilter = "all";
-let reviewQueue = [];
-let stats = null;
+let reviewQueue   = [];
 
-// Helper
 function esc(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// Navigation
+// ── Navigation ────────────────────────────────────────────────
 document.getElementById("back-btn").addEventListener("click", () => {
   window.location.href = chrome.runtime.getURL("popup/popup.html");
 });
 
-document.getElementById("refresh-btn").addEventListener("click", () => {
-  loadReviewQueue();
-});
+document.getElementById("refresh-btn").addEventListener("click", loadReviewQueue);
 
-// Filter buttons
 document.querySelectorAll(".review-filter-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".review-filter-btn").forEach(b => b.classList.remove("active"));
@@ -39,29 +54,27 @@ document.querySelectorAll(".review-filter-btn").forEach(btn => {
   });
 });
 
-// Load stats
+// ── Stats ─────────────────────────────────────────────────────
 async function loadStats() {
   try {
-    const token = (await chrome.storage.local.get("token")).token;
-    if (!token) {
-      window.location.href = chrome.runtime.getURL("popup/login.html");
-      return;
-    }
+    const { token } = await chrome.storage.local.get("token");
+    if (!token) return;
 
-    stats = await apiFetch("/review/stats", {
-      headers: buildHeaders({ "Authorization": `Bearer ${token}` })
+    const res = await _reviewFetch("/review/stats", {
+      headers: _reviewHeaders({ "Authorization": `Bearer ${token}` }),
     });
-    const statsData = await readJsonSafe(stats) || {};
+    if (!res.ok) return;
+    const data = await _reviewJson(res) || {};
 
-    document.getElementById("stat-pending").textContent = statsData.total_pending ?? "-";
-    document.getElementById("stat-today").textContent   = statsData.reviewed_today ?? "-";
-    document.getElementById("stat-priority").textContent = statsData.high_priority_count ?? "-";
+    document.getElementById("stat-pending").textContent  = data.total_pending       ?? "-";
+    document.getElementById("stat-today").textContent    = data.reviewed_today      ?? "-";
+    document.getElementById("stat-priority").textContent = data.high_priority_count ?? "-";
   } catch (e) {
-    console.error("Failed to load stats:", e);
+    console.warn("Stats load failed:", e.message);
   }
 }
 
-// Load review queue
+// ── Queue ─────────────────────────────────────────────────────
 async function loadReviewQueue() {
   const content = document.getElementById("review-content");
   content.innerHTML = `
@@ -71,32 +84,31 @@ async function loadReviewQueue() {
     </div>`;
 
   try {
-    const token = (await chrome.storage.local.get("token")).token;
-    if (!token) {
-      window.location.href = chrome.runtime.getURL("popup/login.html");
-      return;
-    }
+    const { token } = await chrome.storage.local.get("token");
+    if (!token) { window.location.href = chrome.runtime.getURL("popup/login.html"); return; }
 
-    const res = await apiFetch(`/review/queue?priority=${currentFilter}&limit=20`, {
-      headers: buildHeaders({ "Authorization": `Bearer ${token}` })
+    const res = await _reviewFetch(`/review/queue?priority=${currentFilter}&limit=20`, {
+      headers: _reviewHeaders({ "Authorization": `Bearer ${token}` }),
     });
-    if (res.status === 401) { window.location.href = chrome.runtime.getURL("popup/login.html"); return; }
-    reviewQueue = await readJsonSafe(res) || [];
 
-    if (reviewQueue.length === 0) {
+    if (res.status === 401) { window.location.href = chrome.runtime.getURL("popup/login.html"); return; }
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+    reviewQueue = await _reviewJson(res) || [];
+
+    if (!reviewQueue.length) {
       content.innerHTML = `
         <div class="empty-state">
           <span class="material-symbols-outlined ms-24" style="color:var(--accent);margin-bottom:8px">check_circle</span>
           <div style="font-size:13px;color:var(--t2)">No claims to review</div>
-          <div style="font-size:11px;color:var(--t3);margin-top:4px">All ${currentFilter} claims have been reviewed</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:4px">All ${esc(currentFilter)} claims have been reviewed</div>
         </div>`;
       return;
     }
 
-    renderReviewQueue();
-    loadStats(); // Refresh stats
+    renderQueue();
+    loadStats();
   } catch (e) {
-    console.error("Failed to load review queue:", e);
     content.innerHTML = `
       <div class="error-state">
         <span class="material-symbols-outlined ms-24" style="color:var(--fake)">error</span>
@@ -106,207 +118,136 @@ async function loadReviewQueue() {
   }
 }
 
-// Render review queue
-function renderReviewQueue() {
+function renderQueue() {
   const content = document.getElementById("review-content");
   content.innerHTML = "";
-
-  reviewQueue.forEach(item => {
-    const card = createReviewCard(item);
-    content.appendChild(card);
-  });
+  reviewQueue.forEach(item => content.appendChild(createCard(item)));
 }
 
-// Create review card
-function createReviewCard(item) {
+// ── Card ──────────────────────────────────────────────────────
+function createCard(item) {
   const card = document.createElement("div");
-  card.className = "review-card";
-  if (item.already_reviewed) {
-    card.classList.add("review-card-reviewed");
-  }
+  card.className = "review-card" + (item.already_reviewed ? " review-card-reviewed" : "");
 
-  const confPct = Math.round(item.confidence * 100);
-  const mlPct = Math.round(item.ml_score * 100);
-  const aiPct = item.ai_score ? Math.round(item.ai_score * 100) : null;
-  const evidencePct = item.evidence_score ? Math.round(item.evidence_score * 100) : null;
+  const confPct = Math.round((item.confidence || 0) * 100);
+  const mlPct   = Math.round((item.ml_score   || 0) * 100);
+  const aiPct   = item.ai_score       != null ? Math.round(item.ai_score * 100)       : null;
+  const evPct   = item.evidence_score != null ? Math.round(item.evidence_score * 100) : null;
 
-  // Priority badges
-  let priorityBadges = "";
-  if (item.is_viral) {
-    priorityBadges += `<span class="priority-badge priority-viral">🔥 Viral</span>`;
-  }
-  if (item.is_trending) {
-    priorityBadges += `<span class="priority-badge priority-trending">📈 Trending</span>`;
-  }
-  if (item.cluster_size && item.cluster_size > 5) {
-    priorityBadges += `<span class="priority-badge priority-cluster">🔗 ${item.cluster_size} similar</span>`;
-  }
+  let badges = "";
+  if (item.is_viral)                          badges += `<span class="priority-badge priority-viral">🔥 Viral</span>`;
+  if (item.is_trending)                       badges += `<span class="priority-badge priority-trending">📈 Trending</span>`;
+  if (item.cluster_size && item.cluster_size > 5) badges += `<span class="priority-badge priority-cluster">🔗 ${item.cluster_size} similar</span>`;
+
+  const vClass = item.current_verdict === "fake" ? "v-fake" : item.current_verdict === "real" ? "v-real" : "v-uncertain";
 
   card.innerHTML = `
     <div class="review-card-header">
-      <div class="review-card-verdict ${item.current_verdict === 'fake' ? 'v-fake' : item.current_verdict === 'real' ? 'v-real' : 'v-uncertain'}">
-        ${item.current_verdict.toUpperCase()}
-      </div>
+      <div class="review-card-verdict ${vClass}">${esc(item.current_verdict.toUpperCase())}</div>
       <div class="review-card-conf">${confPct}%</div>
     </div>
-
-    ${priorityBadges ? `<div class="review-card-badges">${priorityBadges}</div>` : ""}
-
+    ${badges ? `<div class="review-card-badges">${badges}</div>` : ""}
     <div class="review-card-claim">${esc(item.claim_text)}</div>
-
     <div class="review-card-scores">
       <div class="review-score-item">
         <span class="review-score-label">ML</span>
-        <div class="review-score-bar">
-          <div class="review-score-fill" style="width:${mlPct}%;background:${mlPct > 50 ? 'var(--fake)' : 'var(--real)'}"></div>
-        </div>
+        <div class="review-score-bar"><div class="review-score-fill" style="width:${mlPct}%;background:${mlPct > 50 ? "var(--fake)" : "var(--real)"}"></div></div>
         <span class="review-score-val">${mlPct}%</span>
       </div>
-      ${aiPct !== null ? `
+      ${aiPct != null ? `
       <div class="review-score-item">
         <span class="review-score-label">AI</span>
-        <div class="review-score-bar">
-          <div class="review-score-fill" style="width:${aiPct}%;background:var(--accent)"></div>
-        </div>
+        <div class="review-score-bar"><div class="review-score-fill" style="width:${aiPct}%;background:var(--accent)"></div></div>
         <span class="review-score-val">${aiPct}%</span>
       </div>` : ""}
-      ${evidencePct !== null ? `
+      ${evPct != null ? `
       <div class="review-score-item">
         <span class="review-score-label">Evidence</span>
-        <div class="review-score-bar">
-          <div class="review-score-fill" style="width:${evidencePct}%;background:${evidencePct > 50 ? 'var(--real)' : 'var(--fake)'}"></div>
-        </div>
-        <span class="review-score-val">${evidencePct}%</span>
+        <div class="review-score-bar"><div class="review-score-fill" style="width:${evPct}%;background:${evPct > 50 ? "var(--real)" : "var(--fake)"}"></div></div>
+        <span class="review-score-val">${evPct}%</span>
       </div>` : ""}
     </div>
-
-    ${item.already_reviewed ? `
-      <div class="review-card-reviewed-note">
-        <span class="material-symbols-outlined ms-12">check_circle</span>
-        Already reviewed by you
-      </div>
-    ` : `
-      <div class="review-card-actions">
-        <button class="review-btn review-btn-real" data-id="${item.id}" data-verdict="real">
-          <span class="material-symbols-outlined ms-14">check_circle</span>
-          Real
-        </button>
-        <button class="review-btn review-btn-fake" data-id="${item.id}" data-verdict="fake">
-          <span class="material-symbols-outlined ms-14">cancel</span>
-          Fake
-        </button>
-        <button class="review-btn review-btn-skip" data-id="${item.id}">
-          <span class="material-symbols-outlined ms-14">skip_next</span>
-          Skip
-        </button>
-      </div>
-    `}
-
+    ${item.already_reviewed
+      ? `<div class="review-card-reviewed-note"><span class="material-symbols-outlined ms-12">check_circle</span> Already reviewed</div>`
+      : `<div class="review-card-actions">
+           <button class="review-btn review-btn-real"><span class="material-symbols-outlined ms-14">check_circle</span> Real</button>
+           <button class="review-btn review-btn-fake"><span class="material-symbols-outlined ms-14">cancel</span> Fake</button>
+           <button class="review-btn review-btn-skip"><span class="material-symbols-outlined ms-14">skip_next</span> Skip</button>
+         </div>`}
     <div class="review-card-meta">
       <span class="material-symbols-outlined ms-12">schedule</span>
       ${formatDate(item.created_at)}
-    </div>
-  `;
+    </div>`;
 
-  // Add event listeners for review buttons
   if (!item.already_reviewed) {
     card.querySelector(".review-btn-real").addEventListener("click", () => submitReview(item.id, "real", card));
     card.querySelector(".review-btn-fake").addEventListener("click", () => submitReview(item.id, "fake", card));
-    card.querySelector(".review-btn-skip").addEventListener("click", () => skipReview(card));
+    card.querySelector(".review-btn-skip").addEventListener("click", () => skipCard(card));
   }
-
   return card;
 }
 
-// Submit review
-async function submitReview(claimId, verdict, cardElement) {
-  const buttons = cardElement.querySelectorAll(".review-btn");
-  buttons.forEach(btn => btn.disabled = true);
-
+// ── Submit ────────────────────────────────────────────────────
+async function submitReview(claimId, verdict, card) {
+  card.querySelectorAll(".review-btn").forEach(b => b.disabled = true);
   try {
-    const token = (await chrome.storage.local.get("token")).token;
-    
-    await apiFetch("/review/submit", {
+    const { token } = await chrome.storage.local.get("token");
+    const res = await _reviewFetch("/review/submit", {
       method: "POST",
-      headers: buildHeaders({
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      }),
-      body: JSON.stringify({ claim_id: claimId, verdict })
+      headers: _reviewHeaders({ "Content-Type": "application/json", "Authorization": `Bearer ${token}` }),
+      body: JSON.stringify({ claim_id: claimId, verdict }),
     });
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
 
-    // Show success feedback
-    cardElement.classList.add("review-card-submitted");
-    cardElement.innerHTML = `
+    card.innerHTML = `
       <div class="review-success">
         <span class="material-symbols-outlined ms-24" style="color:var(--real)">check_circle</span>
         <div style="font-size:13px;color:var(--t1);margin-top:8px">Review submitted!</div>
         <div style="font-size:11px;color:var(--t3);margin-top:4px">Verdict: ${verdict.toUpperCase()}</div>
       </div>`;
 
-    // Remove card after animation
     setTimeout(() => {
-      cardElement.style.opacity = "0";
-      cardElement.style.transform = "translateX(-20px)";
+      card.style.cssText = "opacity:0;transform:translateX(-20px);transition:all .3s";
       setTimeout(() => {
-        cardElement.remove();
-        // Reload if queue is empty
-        if (document.querySelectorAll(".review-card").length === 0) {
-          loadReviewQueue();
-        }
+        card.remove();
+        if (!document.querySelector(".review-card")) loadReviewQueue();
       }, 300);
-    }, 1500);
+    }, 1400);
 
-    // Refresh stats
     loadStats();
-
   } catch (e) {
-    console.error("Failed to submit review:", e);
-    buttons.forEach(btn => btn.disabled = false);
-    
-    // Show error
-    const errorDiv = document.createElement("div");
-    errorDiv.className = "review-error";
-    errorDiv.textContent = "Failed to submit review";
-    cardElement.appendChild(errorDiv);
-    setTimeout(() => errorDiv.remove(), 3000);
+    card.querySelectorAll(".review-btn").forEach(b => b.disabled = false);
+    const err = document.createElement("div");
+    err.className = "review-error";
+    err.textContent = "Failed: " + e.message;
+    card.appendChild(err);
+    setTimeout(() => err.remove(), 3000);
   }
 }
 
-// Skip review
-function skipReview(cardElement) {
-  cardElement.style.opacity = "0";
-  cardElement.style.transform = "translateX(20px)";
+function skipCard(card) {
+  card.style.cssText = "opacity:0;transform:translateX(20px);transition:all .3s";
   setTimeout(() => {
-    cardElement.remove();
-    if (document.querySelectorAll(".review-card").length === 0) {
-      loadReviewQueue();
-    }
+    card.remove();
+    if (!document.querySelector(".review-card")) loadReviewQueue();
   }, 300);
 }
 
-// Format date
-function formatDate(dateStr) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diff = now - date;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
+function formatDate(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return "Just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7)  return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
 }
 
-// Initialize
-chrome.storage.local.get("token", d => {
-  if (!d.token) {
-    window.location.href = chrome.runtime.getURL("popup/login.html");
-    return;
-  }
+// ── Init ──────────────────────────────────────────────────────
+chrome.storage.local.get("token", ({ token }) => {
+  if (!token) { window.location.href = chrome.runtime.getURL("popup/login.html"); return; }
   loadStats();
   loadReviewQueue();
 });
