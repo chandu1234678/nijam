@@ -195,14 +195,18 @@ def _run_data_collection(db_factory):
                         if not text or len(text) < 30:
                             continue
                         verdict = "fake" if s.get("label", 0) == 1 else "real"
-                        # Avoid duplicates — check if this text already exists
+                        # Dedup by SHA-256 hash of first 200 chars (fast, avoids full-text scan)
+                        import hashlib
+                        text_hash = hashlib.sha256(text[:200].lower().encode()).hexdigest()[:16]
                         exists = db.query(UserFeedback).filter(
-                            UserFeedback.claim_text == text[:1000]
+                            UserFeedback.claim_text.like(f"%{text_hash}%")
                         ).first()
                         if not exists:
+                            # Embed hash in claim_text so future dedup works
+                            stored_text = f"[{text_hash}] {text[:990]}"
                             db.add(UserFeedback(
-                                user_id    = None,   # system-generated
-                                claim_text = text[:1000],
+                                user_id    = None,
+                                claim_text = stored_text,
                                 predicted  = "uncertain",
                                 actual     = verdict,
                                 confidence = 0.75,

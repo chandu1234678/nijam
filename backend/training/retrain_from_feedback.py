@@ -103,8 +103,12 @@ def load_feedback() -> pd.DataFrame:
         data = []
         for r in rows:
             if r.claim_text and r.actual in ("fake", "real"):
+                # Strip the dedup hash prefix if present: "[abc123] actual text"
+                text = r.claim_text
+                if text.startswith("[") and "] " in text[:20]:
+                    text = text[text.index("] ") + 2:]
                 data.append({
-                    "combined": r.claim_text,
+                    "combined": text,
                     "label":    1 if r.actual == "fake" else 0,
                     "source":   "feedback",
                 })

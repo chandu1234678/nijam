@@ -42,6 +42,7 @@
     <button class="review-filter-btn" data-filter="coordinated">Coordinated</button>
   </div>
 
+  <!-- Scrollable content — flex:1 fills space between filters and nav -->
   <div class="page-body" id="review-content">
     <div class="review-loading">
       <div class="spin-ring"></div>
@@ -49,31 +50,31 @@
     </div>
   </div>
 
-</div>
+  <!-- Bottom nav INSIDE page-wrap so it stays at the bottom -->
+  <nav class="bottom-nav">
+    <a href="popup.html">
+      <span class="material-symbols-outlined">chat</span>
+      <span>Chat</span>
+    </a>
+    <a href="dashboard.html">
+      <span class="material-symbols-outlined">dashboard</span>
+      <span>Dashboard</span>
+    </a>
+    <a href="review.html" class="active">
+      <span class="material-symbols-outlined">fact_check</span>
+      <span>Review</span>
+    </a>
+    <a href="history.html">
+      <span class="material-symbols-outlined">history</span>
+      <span>History</span>
+    </a>
+    <a href="settings.html">
+      <span class="material-symbols-outlined">settings</span>
+      <span>Settings</span>
+    </a>
+  </nav>
 
-<!-- Bottom navigation -->
-<nav class="bottom-nav">
-  <a href="popup.html">
-    <span class="material-symbols-outlined">chat</span>
-    <span>Chat</span>
-  </a>
-  <a href="dashboard.html">
-    <span class="material-symbols-outlined">dashboard</span>
-    <span>Dashboard</span>
-  </a>
-  <a href="review.html" class="active">
-    <span class="material-symbols-outlined">fact_check</span>
-    <span>Review</span>
-  </a>
-  <a href="history.html">
-    <span class="material-symbols-outlined">history</span>
-    <span>History</span>
-  </a>
-  <a href="settings.html">
-    <span class="material-symbols-outlined">settings</span>
-    <span>Settings</span>
-  </a>
-</nav>
+</div>
 
 <!-- WebSocket Status Indicator -->
 <div class="ws-status" id="ws-status">

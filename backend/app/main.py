@@ -1,13 +1,60 @@
 import os
 import logging
 import json
+import math
 import warnings
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 
 # Suppress scikit-learn version warnings (models trained on 1.6.1)
 warnings.filterwarnings('ignore', category=UserWarning, module='sklearn')
+
+# ── Custom JSON encoder — sanitize nan/inf from numpy/sklearn ─
+class _SafeJSONEncoder(json.JSONEncoder):
+    """Replace nan/inf float values with None so JSON serialization never crashes."""
+    def iterencode(self, o, _one_shot=False):
+        return super().iterencode(self._sanitize(o), _one_shot)
+
+    def _sanitize(self, obj):
+        if isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return obj
+        if isinstance(obj, dict):
+            return {k: self._sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [self._sanitize(v) for v in obj]
+        return obj
+
+# Monkey-patch FastAPI's default JSON encoder
+import fastapi.responses as _fr
+_orig_render = _fr.JSONResponse.render
+
+def _safe_render(self, content):
+    try:
+        return _orig_render(self, content)
+    except (ValueError, OverflowError):
+        # Fallback: sanitize all floats then re-encode
+        import numpy as np
+
+        def _fix(obj):
+            if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return None
+            if hasattr(obj, 'item'):  # numpy scalar
+                v = obj.item()
+                return None if (isinstance(v, float) and (math.isnan(v) or math.isinf(v))) else v
+            if isinstance(obj, dict):
+                return {k: _fix(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [_fix(v) for v in obj]
+            return obj
+
+        return json.dumps(_fix(content), allow_nan=False).encode("utf-8")
+
+_fr.JSONResponse.render = _safe_render
 
 from database import engine, Base
 import app.models  # register models
