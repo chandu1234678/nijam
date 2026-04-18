@@ -91,6 +91,36 @@ async def lifespan(app: FastAPI):
     except (ImportError, Exception) as e:
         logger.debug("Sentence-transformers pre-warm skipped: %s", e)
 
+    # ── Start background data collection scheduler ────────────
+    # Collects fresh labeled training data every 24h from web search + fact-checkers
+    # Non-blocking — runs in a daemon thread
+    try:
+        import threading, time as _time
+        from database import SessionLocal
+
+        def _collection_scheduler():
+            """Check every hour if it's time to collect new training data."""
+            _time.sleep(300)  # wait 5 min after startup before first check
+            while True:
+                try:
+                    from app.analysis.continuous_learning import maybe_collect_data
+                    result = maybe_collect_data(SessionLocal)
+                    if result.get("triggered"):
+                        logger.info("Background data collection triggered: %s", result.get("reason"))
+                except Exception as e:
+                    logger.debug("Collection scheduler error: %s", e)
+                _time.sleep(3600)  # check every hour
+
+        _sched_thread = threading.Thread(
+            target=_collection_scheduler,
+            daemon=True,
+            name="data-collection-scheduler",
+        )
+        _sched_thread.start()
+        logger.info("Background data collection scheduler started (every 24h)")
+    except Exception as e:
+        logger.warning("Data collection scheduler failed to start: %s", e)
+
     yield
 
 

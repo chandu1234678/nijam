@@ -1,7 +1,7 @@
 // ── Backend API URL ───────────────────────────────────────────
 // Switch between local dev and production by toggling these two lines:
-// const API = "http://localhost:8000";           // Local dev
-const API = "https://fake-news-analyzer-j6ka.onrender.com";  // Production (Render)
+const API = "http://localhost:8000";           // Local dev
+//const API = "https://fake-news-analyzer-j6ka.onrender.com";  // Production (Render)
 
 const API_TIMEOUT_MS = 20000;
 const CLIENT_NAME = "edge-extension";

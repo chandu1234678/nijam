@@ -5,10 +5,10 @@ Monitors user feedback count and triggers model retraining when:
 - 50+ new corrections have accumulated since last retrain
 - OR it's been 7 days since last retrain and 10+ corrections exist
 
-Runs in a background thread — non-blocking, won't affect request latency.
-The retrain uses the existing retrain_from_feedback.py script.
+Also runs a daily background job to collect fresh labeled training data
+from live news sources (Reuters, BBC, AP, fact-checkers) via Tavily/NewsAPI.
 
-Triggered automatically after each feedback submission.
+Runs in background threads — non-blocking, won't affect request latency.
 """
 import os
 import json
@@ -20,12 +20,16 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 _DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
-_RETRAIN_THRESHOLD   = 50   # corrections before auto-retrain
-_RETRAIN_MIN         = 10   # minimum corrections needed
-_RETRAIN_INTERVAL_DAYS = 7  # days between scheduled retrains
+_RETRAIN_THRESHOLD     = 50   # corrections before auto-retrain
+_RETRAIN_MIN           = 10   # minimum corrections needed
+_RETRAIN_INTERVAL_DAYS = 7    # days between scheduled retrains
+_COLLECT_INTERVAL_HRS  = 24   # hours between auto data collection
 
-_retrain_lock = threading.Lock()
-_is_retraining = False
+_retrain_lock    = threading.Lock()
+_is_retraining   = False
+_collect_lock    = threading.Lock()
+_is_collecting   = False
+_last_collect_ts = 0.0        # epoch seconds of last collection
 
 
 def _get_version_info() -> dict:
@@ -140,3 +144,140 @@ def maybe_retrain(db) -> dict:
     except Exception as e:
         logger.debug("maybe_retrain check failed: %s", e)
         return {"triggered": False, "reason": str(e)}
+
+
+# ─────────────────────────────────────────────────────────────
+# AUTO DATA COLLECTION — runs every 24 hours in background
+# Fetches fresh labeled samples from web search + Wikipedia
+# ─────────────────────────────────────────────────────────────
+
+_COLLECTION_TOPICS = [
+    "misinformation",
+    "fake news health",
+    "political misinformation",
+    "climate misinformation",
+    "vaccine misinformation",
+    "election misinformation",
+]
+
+
+def _run_data_collection(db_factory):
+    """
+    Background thread: collect fresh labeled training data from:
+    - Tavily/NewsAPI (real news from Reuters/BBC/AP + debunked claims from fact-checkers)
+    - Wikipedia entity facts (via Wikidata)
+    Stores results as UserFeedback records for the next retrain cycle.
+    """
+    global _is_collecting, _last_collect_ts
+    with _collect_lock:
+        if _is_collecting:
+            return
+        _is_collecting = True
+
+    try:
+        import time
+        from app.analysis.news_aggregator import collect_training_samples
+
+        logger.info("Auto data collection started — topics: %s", _COLLECTION_TOPICS)
+        total_added = 0
+
+        db = db_factory()
+        try:
+            from app.models import UserFeedback
+
+            for topic in _COLLECTION_TOPICS:
+                try:
+                    samples = collect_training_samples(topic=topic, max_samples=30)
+                    added = 0
+                    for s in samples:
+                        text = s.get("text", "").strip()
+                        if not text or len(text) < 30:
+                            continue
+                        verdict = "fake" if s.get("label", 0) == 1 else "real"
+                        # Avoid duplicates — check if this text already exists
+                        exists = db.query(UserFeedback).filter(
+                            UserFeedback.claim_text == text[:1000]
+                        ).first()
+                        if not exists:
+                            db.add(UserFeedback(
+                                user_id    = None,   # system-generated
+                                claim_text = text[:1000],
+                                predicted  = "uncertain",
+                                actual     = verdict,
+                                confidence = 0.75,
+                            ))
+                            added += 1
+
+                    db.commit()
+                    total_added += added
+                    logger.info("Collected %d samples for topic '%s'", added, topic)
+                    time.sleep(2)  # rate limit between topics
+
+                except Exception as e:
+                    logger.warning("Collection failed for topic '%s': %s", topic, e)
+                    db.rollback()
+
+        finally:
+            db.close()
+
+        _last_collect_ts = __import__("time").time()
+        logger.info("Auto data collection complete — %d total new samples added", total_added)
+
+        # Trigger retrain check after collection
+        if total_added > 0:
+            logger.info("Triggering retrain check after data collection")
+            # Use a fresh DB session for retrain check
+            db2 = db_factory()
+            try:
+                from app.models import UserFeedback
+                from sqlalchemy import func
+                count = db2.query(func.count(UserFeedback.id)).filter(
+                    UserFeedback.predicted != UserFeedback.actual
+                ).scalar() or 0
+                should, reason = _should_retrain(count)
+                if should and not _is_retraining:
+                    thread = threading.Thread(
+                        target=_run_retrain, args=(count,),
+                        daemon=True, name="post-collect-retrain"
+                    )
+                    thread.start()
+                    logger.info("Post-collection retrain triggered: %s", reason)
+            finally:
+                db2.close()
+
+    except Exception as e:
+        logger.error("Auto data collection error: %s", e)
+    finally:
+        with _collect_lock:
+            _is_collecting = False
+
+
+def maybe_collect_data(db_factory) -> dict:
+    """
+    Check if it's time to collect fresh training data and start if so.
+    Call this from a periodic background task (e.g. every hour from lifespan).
+
+    db_factory: callable that returns a new DB session (e.g. SessionLocal)
+    """
+    import time
+    global _last_collect_ts
+
+    elapsed_hrs = (time.time() - _last_collect_ts) / 3600
+    if elapsed_hrs < _COLLECT_INTERVAL_HRS:
+        return {
+            "triggered": False,
+            "reason": f"Last collection {elapsed_hrs:.1f}h ago (interval: {_COLLECT_INTERVAL_HRS}h)",
+        }
+
+    if _is_collecting:
+        return {"triggered": False, "reason": "Collection already running"}
+
+    thread = threading.Thread(
+        target=_run_data_collection,
+        args=(db_factory,),
+        daemon=True,
+        name="auto-collect",
+    )
+    thread.start()
+    logger.info("Auto data collection scheduled")
+    return {"triggered": True, "reason": f"Interval {_COLLECT_INTERVAL_HRS}h elapsed"}
