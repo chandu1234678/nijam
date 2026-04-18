@@ -90,7 +90,8 @@ def _run_retrain(feedback_count: int):
 
         result = subprocess.run(
             [sys.executable, script],
-            capture_output=True, text=True, timeout=300
+            capture_output=True, text=True, timeout=300,
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
         if result.returncode == 0:
             logger.info("Auto-retrain completed successfully:\n%s", result.stdout[-500:])
