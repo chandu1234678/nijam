@@ -113,7 +113,7 @@ def _run_pipeline_parallel(text: str, image_url: str = None, db=None):
     """Run ML, AI, evidence in parallel. Image/platform only if configured."""
     results = {
         "ml": None, "ai": (None, ""), "evidence": (None, [], []),
-        "image": None, "platform": None,
+        "image": None, "platform": None, "inoculation": None,
     }
 
     def do_ml():       return run_ml_analysis(text)
@@ -140,15 +140,26 @@ def _run_pipeline_parallel(text: str, image_url: str = None, db=None):
         except Exception:
             return None
 
-    # Cap at 3 workers to stay within 512MB RAM on Render free tier
-    # image/platform only run when explicitly needed
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Inoculation — run in parallel with pipeline (only if manipulation signals present)
+    def do_inoculation():
+        try:
+            manip_pre, _ = analyze_manipulation(text)
+            if manip_pre > 0.2:
+                from app.analysis.cloud_models import get_inoculation
+                return get_inoculation(text[:500])  # use original text (primary_claim not yet extracted)
+        except Exception:
+            pass
+        return None
+
+    # Cap at 4 workers (added inoculation as parallel task)
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
-            executor.submit(do_ml):       "ml",
-            executor.submit(do_ai):       "ai",
-            executor.submit(do_evidence): "evidence",
+            executor.submit(do_ml):          "ml",
+            executor.submit(do_ai):          "ai",
+            executor.submit(do_evidence):    "evidence",
+            executor.submit(do_inoculation): "inoculation",
         }
-        # Only add image/platform if needed (avoids spawning extra threads)
+        # Only add image/platform if needed
         if image_url:
             futures[executor.submit(do_image)] = "image"
         if os.getenv("GOOGLE_FACTCHECK_API_KEY"):
@@ -258,6 +269,7 @@ def message(
     evidence_score, evidence_urls, evidence_articles = pipeline["evidence"] if pipeline["evidence"] else (None, [], [])
     image_result    = pipeline["image"] or {}
     platform_result = pipeline["platform"] or {}
+    inoculation     = pipeline.get("inoculation")  # from parallel inoculation task
 
     ai_score = float(raw_ai_score) if raw_ai_score is not None else 0.5
 
@@ -268,15 +280,9 @@ def message(
 
     # Manipulation analysis (fast, no API call)
     manip_score, manip_signals = analyze_manipulation(text)
-
-    # ── Psychological inoculation (items 90-94) ───────────────
-    inoculation = None
-    if manip_score > 0.2:
-        try:
-            from app.analysis.cloud_models import get_inoculation
-            inoculation = get_inoculation(primary_claim)
-        except Exception as e:
-            logger.debug("Inoculation skipped: %s", e)
+    # inoculation already computed in parallel pipeline (do_inoculation)
+    if inoculation:
+        logger.info("Inoculation (parallel): technique=%s", inoculation.get("technique"))
 
     # ── Adversarial input detection (item 116) ────────────────
     adversarial_info = None
