@@ -1,15 +1,16 @@
 """
-Real-time Web Search via Tavily API
+Real-time Web Search via Tavily API — PiNE AI
 
-Replaces Brave Search as the primary evidence source.
+Items 127-131: Real-Time Web Grounding
+  127. Tavily (primary) + NewsAPI (fallback) — DONE
+  128. Web scraping for primary sources — added via Tavily full content
+  129. Fact-check aggregator (PolitiFact, Snopes, FactCheck.org) — via Google Fact Check API
+  130. Google Fact Check Tools API cross-reference — DONE in platform_tracker.py
+  131. Evidence provenance chain (source → claim → verdict) — NEW
+
 - Real-time results optimized for AI/RAG use cases
-- 1000 free requests/month
+- 1000 free requests/month on Tavily
 - Clean content extraction with relevance scores
-
-Get your free API key at: https://tavily.com
-Set env var: TAVILY_API_KEY=your-key
-
-Falls back to NewsAPI if Tavily key not configured.
 """
 import os
 import re
@@ -153,3 +154,59 @@ def fetch_brave_evidence(text: str):
     except Exception as e:
         logger.warning("Tavily error: %s", e)
         return None, [], []
+
+
+# ── Evidence Provenance Chain (item 131) ─────────────────────
+
+def build_provenance_chain(claim_text: str, articles: list, verdict: str, confidence: float) -> dict:
+    """
+    Build an evidence provenance chain: source → claim → verdict.
+
+    Structure:
+      {
+        "claim":    str,
+        "verdict":  str,
+        "confidence": float,
+        "chain": [
+          {
+            "step":    int,
+            "source":  str,
+            "url":     str,
+            "stance":  "support"|"contradict"|"neutral",
+            "trust":   float,
+            "bias":    str,
+            "snippet": str,
+          }
+        ],
+        "summary": str,
+      }
+    """
+    chain = []
+    for i, a in enumerate(articles[:5], 1):
+        chain.append({
+            "step":    i,
+            "source":  a.get("source", "Unknown"),
+            "url":     a.get("url", ""),
+            "stance":  a.get("stance", "neutral"),
+            "trust":   a.get("trust_score", 0.5),
+            "bias":    a.get("bias_label", "UNKNOWN"),
+            "snippet": (a.get("title", "") + " — " + a.get("description", ""))[:200],
+        })
+
+    # Summary sentence
+    support_count    = sum(1 for s in chain if s["stance"] == "support")
+    contradict_count = sum(1 for s in chain if s["stance"] == "contradict")
+    if support_count > contradict_count:
+        summary = f"{support_count} source(s) support this claim, {contradict_count} contradict it."
+    elif contradict_count > support_count:
+        summary = f"{contradict_count} source(s) contradict this claim, {support_count} support it."
+    else:
+        summary = f"Evidence is mixed ({support_count} support, {contradict_count} contradict)."
+
+    return {
+        "claim":      claim_text[:200],
+        "verdict":    verdict,
+        "confidence": confidence,
+        "chain":      chain,
+        "summary":    summary,
+    }
