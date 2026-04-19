@@ -269,6 +269,29 @@ def message(
     # Manipulation analysis (fast, no API call)
     manip_score, manip_signals = analyze_manipulation(text)
 
+    # ── Psychological inoculation (items 90-94) ───────────────
+    inoculation = None
+    if manip_score > 0.2:
+        try:
+            from app.analysis.cloud_models import get_inoculation
+            inoculation = get_inoculation(primary_claim)
+        except Exception as e:
+            logger.debug("Inoculation skipped: %s", e)
+
+    # ── Adversarial input detection (item 116) ────────────────
+    adversarial_info = None
+    try:
+        from app.analysis.cloud_models import detect_adversarial_input
+        adv = detect_adversarial_input(text)
+        if adv["is_adversarial"]:
+            adversarial_info = adv
+            logger.warning("Adversarial input detected: %s", adv["signals"])
+            # Use cleaned text for analysis
+            if adv["cleaned_text"] != text:
+                primary_claim = adv["cleaned_text"][:2000]
+    except Exception as e:
+        logger.debug("Adversarial detection skipped: %s", e)
+
     # ── Velocity tracking (rapid spread detection) ────────────
     velocity_metrics = None
     try:
@@ -633,6 +656,10 @@ def message(
             "recommendation": moderation_recommendation,
             "flags": moderation_flags or None,
         },
+        # Psychological inoculation (items 90-94)
+        "inoculation": inoculation,
+        # Adversarial input detection (item 116)
+        "adversarial": adversarial_info,
     }
 
     if session_id:

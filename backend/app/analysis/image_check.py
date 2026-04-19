@@ -202,3 +202,61 @@ def check_image_consistency(claim_text: str, image_source: str = "") -> dict:
             }
 
     return {"images_found": 0, "checks": [], "mismatch_risk": 0.0, "flag": None}
+
+
+# ── Cloud model integration (items 102, 104, 105) ────────────
+
+def analyze_image_full(claim_text: str, image_source: str) -> dict:
+    """
+    Full image analysis pipeline using cloud models:
+      1. Gemini Vision — description + consistency (existing)
+      2. CLIP — image-text similarity score (item 104)
+      3. OCR — extract text from image (item 105)
+      4. Deepfake detection (item 102)
+
+    Returns enriched result with all signals.
+    """
+    # Step 1: Base Gemini Vision analysis
+    base = check_image_consistency(claim_text, image_source)
+
+    # Extract image bytes for cloud models
+    image_b64 = None
+    if image_source and "base64," in image_source:
+        image_b64 = image_source.split("base64,")[1]
+
+    if not image_b64:
+        return base
+
+    try:
+        from app.analysis.cloud_models import (
+            clip_image_text_match, ocr_from_base64, detect_deepfake_b64
+        )
+
+        # Step 2: CLIP similarity (item 104)
+        clip_score = clip_image_text_match(image_b64, claim_text)
+        if clip_score is not None:
+            base["clip_similarity"] = round(clip_score, 4)
+            # Low CLIP score = image doesn't match claim
+            if clip_score < 0.25:
+                base["mismatch_risk"] = max(base.get("mismatch_risk", 0.0), 0.6)
+                base["flag"] = "image_claim_mismatch"
+
+        # Step 3: OCR — extract text from image (item 105)
+        ocr_text = ocr_from_base64(image_b64)
+        if ocr_text and len(ocr_text.strip()) > 5:
+            base["ocr_text"] = ocr_text.strip()[:500]
+            logger.info("OCR extracted %d chars from image", len(ocr_text))
+
+        # Step 4: Deepfake detection (item 102)
+        deepfake = detect_deepfake_b64(image_b64)
+        if deepfake:
+            base["deepfake"] = deepfake
+            if deepfake["is_deepfake"] and deepfake["confidence"] > 0.7:
+                base["mismatch_risk"] = max(base.get("mismatch_risk", 0.0), 0.85)
+                base["flag"] = "deepfake_detected"
+                logger.warning("Deepfake detected: confidence=%.2f", deepfake["confidence"])
+
+    except Exception as e:
+        logger.debug("Cloud image analysis failed: %s", e)
+
+    return base

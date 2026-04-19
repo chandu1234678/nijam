@@ -319,11 +319,11 @@ The backend is successfully running on http://localhost:8000 with the following 
 - [ ] 89. Integrate with threat intelligence feeds
 
 ### P5.3 G현 Psychological Inoculation (Prebunking)
-- [ ] 90. Identify manipulation technique (false dichotomy, emotional appeal, fake expert)
-- [ ] 91. Show one-sentence inoculation message
-- [ ] 92. Example: "This uses an emotional appeal to bypass critical thinking"
-- [ ] 93. Track inoculation effectiveness (A/B test)
-- [ ] 94. Implement based on Roozenbeek & van der Linden (2019) research
+- [x] 90. Identify manipulation technique (false dichotomy, emotional appeal, fake expert) via LLM (false dichotomy, emotional appeal, fake expert)
+- [x] 91. Show one-sentence inoculation message (cloud_models.py get_inoculation) message
+- [x] 92. Example: "This uses an emotional appeal to bypass critical thinking" "This uses an emotional appeal to bypass critical thinking"
+- [~] 93. Track inoculation effectiveness (A/B test pending) (A/B test)
+- [x] 94. Based on Roozenbeek & van der Linden (2019) prebunking research & van der Linden (2019) research
 
 ### P5.4 G현 Passive Feed Scanner
 - [ ] 95. Scan visible text on page every 3 seconds (content.js)
@@ -334,11 +334,11 @@ The backend is successfully running on http://localhost:8000 with the following 
 
 ### P5.5 G현 Multimodal Analysis
 - [x] 100. Improve image-text consistency checking (current: Gemini Vision)
-- [ ] 101. Add reverse image search integration (SerpAPI)
-- [ ] 102. Detect manipulated images (deepfakes, photoshop)
+- [~] 101. Reverse image search via SerpAPI (key in .env, integration pending) integration (SerpAPI)
+- [x] 102. Deepfake detection via prithivMLmods/Deep-Fake-Detector-Model (HF cloud) (deepfakes, photoshop)
 - [ ] 103. Add video analysis (extract frames + audio transcription)
-- [ ] 104. Implement CLIP-based image-text similarity scoring
-- [ ] 105. Add OCR for text extraction from images (Tesseract)
+- [x] 104. CLIP image-text similarity via openai/clip-vit-large-patch14 (HF cloud) image-text similarity scoring
+- [x] 105. OCR via microsoft/trocr-base-printed (HF cloud, no Tesseract needed) from images (Tesseract)
 - [ ] 106. Detect AI-generated images (synthetic media detection)
 
 **Status**: G｀ Image-text consistency implemented! `image_check.py` uses Gemini Vision with rate limiting, retry logic, and fallback models.
@@ -354,11 +354,11 @@ The backend is successfully running on http://localhost:8000 with the following 
 **Status**: G｀ Core implementation complete! `wikidata.py` verifies entities, extracts facts, calculates risk scores. Uses regex patterns (spaCy optional).
 
 ### P5.7 G현 Adversarial Robustness
-- [ ] 113. Generate adversarial examples (character swaps, paraphrases)
+- [~] 113. Adversarial example generation (pending training augmentation) (character swaps, paraphrases)
 - [ ] 114. Train with adversarial augmentation
 - [ ] 115. Implement certified robustness (randomized smoothing)
-- [ ] 116. Add adversarial detection layer (flag suspicious inputs)
-- [ ] 117. Test against known attack patterns (typos, homoglyphs, emoji injection)
+- [x] 116. Adversarial detection layer (homoglyphs, invisible chars, mixed scripts, emoji injection) (flag suspicious inputs)
+- [x] 117. Tested against typos, homoglyphs, emoji injection, zero-width chars (typos, homoglyphs, emoji injection)
 
 ### P5.8 G현 Cross-Lingual Transfer
 - [x] 118. XLM-RoBERTa loaded (FacebookAI/xlm-roberta-large, 100 languages) (mBERT or XLM-RoBERTa)
